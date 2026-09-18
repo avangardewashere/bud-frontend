@@ -1,0 +1,1110 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker course — Session 9 manifest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --paper:      #DDE3E7;
+    --paper-lift: #EAEFF1;
+    --field:      #F4F7F8;
+    --ink:        #12293D;
+    --ink-soft:   #4E6478;
+    --rule:       #B2BFC8;
+    --rule-fine:  #C6D1D8;
+    --blue:       #1E6FA8;
+    --blue-deep:  #0E4772;
+    --oxide:      #9A4620;
+
+    --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --s1: 0.8125rem;
+    --s2: 0.9375rem;
+    --s3: 1.0625rem;
+    --s4: 1.3125rem;
+    --s6: 2.125rem;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { background: var(--paper); }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--s2);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  .masthead { border-bottom: 2px solid var(--ink); background: var(--paper-lift); }
+
+  .masthead-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 18px 24px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 20px;
+  }
+
+  .masthead h1 {
+    margin: 0;
+    font-size: var(--s3);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .masthead .sub { font-size: var(--s1); color: var(--ink-soft); }
+
+  .masthead .gauge {
+    flex: 1 1 200px;
+    min-width: 160px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: var(--s1);
+  }
+
+  .gauge-track {
+    flex: 1;
+    height: 8px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+  }
+
+  .gauge-fill {
+    height: 100%;
+    width: 0;
+    background: var(--blue);
+    transition: width 220ms ease;
+  }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 80px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 44px;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .shell {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 40px;
+      padding: 22px 18px 60px;
+    }
+  }
+
+  .manifest {
+    border: 2px solid var(--ink);
+    background: var(--paper-lift);
+    margin-bottom: 38px;
+  }
+
+  .manifest-top {
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .manifest-no {
+    border-right: 1px solid var(--rule);
+    padding: 14px 0;
+    text-align: center;
+    font-family: var(--mono);
+  }
+
+  .manifest-no b {
+    display: block;
+    font-size: var(--s6);
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .manifest-no span { font-size: 0.6875rem; color: var(--ink-soft); }
+
+  .manifest-title { padding: 14px 18px; }
+
+  .manifest-title h2 {
+    margin: 0 0 3px;
+    font-size: var(--s4);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .manifest-title p { margin: 0; font-size: var(--s1); color: var(--ink-soft); }
+
+  .budget { display: grid; grid-template-columns: repeat(3, 1fr); }
+
+  .budget div { padding: 10px 14px; font-size: var(--s1); }
+
+  .budget div + div { border-left: 1px solid var(--rule-fine); }
+
+  .budget b { display: block; font-weight: 500; }
+
+  .budget span { font-family: var(--mono); color: var(--ink-soft); font-size: 0.75rem; }
+
+  .block { margin-bottom: 42px; }
+
+  .block-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .block-head h3 { margin: 0; font-size: var(--s3); font-weight: 600; }
+
+  .block-head .count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .block-note {
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    margin: 8px 0 20px;
+    max-width: 62ch;
+  }
+
+  .item { border-bottom: 1px solid var(--rule-fine); padding: 15px 0 17px; }
+
+  .item-row { display: flex; gap: 12px; align-items: flex-start; }
+
+  .tick {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    margin: 3px 0 0;
+    background: var(--field);
+    border: 1.5px solid var(--ink-soft);
+    cursor: pointer;
+    position: relative;
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+
+  .tick:checked { background: var(--blue); border-color: var(--blue-deep); }
+
+  .tick:checked::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    background: var(--paper-lift);
+  }
+
+  .item-body { flex: 1 1 auto; min-width: 0; }
+
+  .item-label { font-size: var(--s2); cursor: pointer; display: block; }
+
+  .tick:checked ~ .item-body .item-label { color: var(--ink-soft); }
+
+  .item-hint {
+    margin: 5px 0 0;
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+
+  .cmd {
+    margin-top: 9px;
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--rule);
+    background: var(--field);
+  }
+
+  .cmd code {
+    flex: 1 1 auto;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    padding: 8px 11px;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--blue-deep);
+  }
+
+  .cmd.file { border-left: 3px solid var(--ink-soft); }
+
+  .cmd.file code { color: var(--ink); }
+
+  .copy {
+    flex: 0 0 auto;
+    border: 0;
+    border-left: 1px solid var(--rule);
+    background: transparent;
+    font-family: var(--sans);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 0 10px;
+    cursor: pointer;
+  }
+
+  .copy:hover { background: var(--paper); color: var(--ink); }
+
+  .filename {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    margin: 12px 0 0;
+  }
+
+  .alt {
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    margin: 8px 0 0;
+    padding-left: 11px;
+    border-left: 2px solid var(--rule);
+    max-width: 62ch;
+  }
+
+  .alt code { font-family: var(--mono); }
+
+  .note {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 9px 11px;
+    font-family: var(--sans);
+    font-size: var(--s2);
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--field);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--blue);
+    resize: vertical;
+  }
+
+  .note::placeholder { color: #8496A3; }
+
+  .note.tall { min-height: 150px; }
+
+  .measure {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    border: 1px solid var(--rule);
+    background: var(--field);
+  }
+
+  .measure th,
+  .measure td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--rule-fine);
+    font-size: var(--s1);
+    vertical-align: top;
+  }
+
+  .measure th { font-weight: 500; color: var(--ink-soft); }
+
+  .measure tr:last-child td { border-bottom: 0; }
+
+  .measure code { font-family: var(--mono); color: var(--blue-deep); }
+
+  .measure input {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    background: transparent;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    color: var(--ink);
+    padding: 2px 0;
+  }
+
+  .measure .narrow { width: 92px; }
+
+  .pitfall {
+    border-left: 3px solid var(--oxide);
+    background: var(--paper-lift);
+    padding: 12px 15px;
+    margin-top: 24px;
+    font-size: var(--s1);
+    max-width: 66ch;
+  }
+
+  .pitfall b { font-weight: 600; }
+
+  .pitfall p { margin: 0 0 7px; }
+
+  .pitfall p:last-child { margin-bottom: 0; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 30px;
+    padding-top: 22px;
+    border-top: 1px solid var(--ink);
+  }
+
+  .btn {
+    font-family: var(--sans);
+    font-size: var(--s2);
+    font-weight: 500;
+    padding: 9px 15px;
+    border: 1.5px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper-lift);
+    cursor: pointer;
+  }
+
+  .btn.ghost { background: transparent; color: var(--ink); }
+
+  .btn.ghost:hover { background: var(--paper-lift); }
+
+  .btn.quiet {
+    border-color: var(--rule);
+    background: transparent;
+    color: var(--ink-soft);
+    font-weight: 400;
+  }
+
+  .btn.quiet:hover { color: var(--oxide); border-color: var(--oxide); }
+
+  .status {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+
+  .status.show { opacity: 1; }
+
+  .tracker { position: sticky; top: 22px; }
+
+  @media (max-width: 900px) { .tracker { position: static; } }
+
+  .tracker h3 { margin: 0 0 3px; font-size: var(--s3); font-weight: 600; }
+
+  .tracker .lede { margin: 0 0 16px; font-size: var(--s1); color: var(--ink-soft); }
+
+  .crown {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 6px 9px;
+    border: 1px dashed var(--rule);
+    margin-bottom: 4px;
+  }
+
+  .crown.earned {
+    color: var(--paper-lift);
+    background: var(--blue-deep);
+    border: 1px solid var(--blue-deep);
+  }
+
+  .stack { display: flex; flex-direction: column-reverse; }
+
+  .layer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 10px;
+    margin-top: 2px;
+    background: var(--paper-lift);
+    border: 1px solid var(--rule-fine);
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .layer-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0;
+    background: rgba(30, 111, 168, 0.16);
+    border-right: 1px solid rgba(14, 71, 114, 0.35);
+    transition: width 260ms ease;
+    pointer-events: none;
+  }
+
+  .layer.done { border-color: var(--blue-deep); }
+
+  .layer-no {
+    position: relative;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    flex: 0 0 auto;
+  }
+
+  .layer.done .layer-no { color: var(--blue-deep); }
+
+  .layer-name {
+    position: relative;
+    font-size: var(--s1);
+    line-height: 1.35;
+    flex: 1 1 auto;
+  }
+
+  .layer-mark {
+    position: relative;
+    flex: 0 0 auto;
+    width: 13px;
+    height: 13px;
+    border: 1.5px solid var(--ink-soft);
+    background: var(--field);
+  }
+
+  .layer.done .layer-mark { background: var(--blue); border-color: var(--blue-deep); }
+
+  .layer.current { border-left: 3px solid var(--blue); padding-left: 8px; }
+
+  .foot {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    background: var(--paper);
+    border: 1px solid var(--rule-fine);
+    border-top: 0;
+    margin-top: 2px;
+  }
+
+  .tracker-meta { margin-top: 14px; font-size: var(--s1); color: var(--ink-soft); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <h1>Docker, ten sessions</h1>
+    <span class="sub">Session worksheet and course tracker</span>
+    <div class="gauge">
+      <span id="gauge-label">0/16</span>
+      <div class="gauge-track"><div class="gauge-fill" id="gauge-fill"></div></div>
+      <span>session 9</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <main>
+
+    <section class="manifest">
+      <div class="manifest-top">
+        <div class="manifest-no">
+          <b>09</b>
+          <span>of ten</span>
+        </div>
+        <div class="manifest-title">
+          <h2>Docker in CI/CD with GitHub Actions</h2>
+          <p>Your machine stops being where images get built. By the end there's a package on your GitHub profile that a pipeline built, tested, scanned and published without you touching it.</p>
+        </div>
+      </div>
+      <div class="budget">
+        <div><b>Theory</b><span>40 min</span></div>
+        <div><b>Hands-on</b><span>115 min</span></div>
+        <div><b>Deliverable</b><span>45 min</span></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h3>Theory</h3>
+        <span class="count" data-count="theory">0/4</span>
+      </div>
+      <p class="block-note">Everything so far is reproducible on one machine. A pipeline makes it reproducible without one, which is the actual point of containers.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t1" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t1">Build once, promote the same artifact</label>
+            <p class="item-hint">The image that passes your tests is the image that reaches production — not a rebuild from the same commit, the identical bytes. Rebuilding per environment reintroduces exactly the drift containers exist to eliminate, and it's why session 8's config split matters: one image, different environment at startup.</p>
+            <textarea class="note" data-note="t1" rows="2" placeholder="Given that rule, what cannot be baked into the image? Check your list from session 4."></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t2" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t2">The commit SHA tag is the only one that means anything</label>
+            <p class="item-hint">Back to session 2: a tag is a movable pointer. <code>latest</code> tells you nothing about what's running — two people pulling it an hour apart can get different images. A <code>sha-abc1234</code> tag maps one image to one commit permanently, which is what you need when production is broken and you want to know what is actually deployed.</p>
+            <textarea class="note" data-note="t2" rows="2" placeholder="How would you find out which commit is currently running in production?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t3" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t3">GHCR and the token that's already there</label>
+            <p class="item-hint">Every workflow run gets a <code>GITHUB_TOKEN</code> automatically, but it starts read-only. Pushing a package needs <code>packages: write</code> declared on the job. No personal access token, no stored secret — the right shape, and worth noticing after session 8.</p>
+            <textarea class="note" data-note="t3" rows="2" placeholder="Why is the built-in token preferable to a PAT stored as a secret?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t4" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t4">Service containers, and the addressing rule again</label>
+            <p class="item-hint">Actions can run a database alongside your job. The catch: if your steps run directly on the runner, the service is at <code>localhost</code> on its mapped port, because the port is published to the runner host. If the job itself runs inside a container, you address it by service name instead. Same distinction as session 7, different clothing.</p>
+            <textarea class="note" data-note="t4" rows="2" placeholder="Your test steps run on the runner, so the connection string is…"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h3>Hands-on</h3>
+        <span class="count" data-count="lab">0/9</span>
+      </div>
+      <p class="block-note">Work on a branch and open a pull request, so every push gives you feedback without touching main. Action versions below were current when this was written; check for newer majors as you go.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h1" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h1">Get a build running in CI with nothing else in it</label>
+            <p class="item-hint">No push, no tests, no cache. Confirm your Dockerfile builds on a machine that isn't yours, which catches anything you accidentally relied on locally. Record this run's duration as row 1.</p>
+            <p class="filename">.github/workflows/container.yml</p>
+            <div class="cmd file"><code>name: container
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: false
+          tags: app:ci</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h2" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h2">Turn on layer caching and run it twice</label>
+            <p class="item-hint">Two lines. The first run after adding them is still cold — it's the second that shows the benefit, so push an empty commit to trigger one. This is session 3's caching lesson operating across machines instead of across builds.</p>
+            <div class="cmd file"><code>          cache-from: type=gha
+          cache-to: type=gha,mode=max</code><button class="copy" type="button">Copy</button></div>
+            <div class="cmd"><code>git commit --allow-empty -m "trigger cached run"
+git push</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h3" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h3">Open the run ledger</label>
+            <p class="item-hint">Five rows, filled as you add each stage. Rows 1 and 2 are the cache measurement; the rest tell you what each safety net costs in wall-clock time, which is the number that decides whether a pipeline gets used or worked around.</p>
+            <table class="measure">
+              <thead>
+                <tr><th>Run</th><th class="narrow">Duration</th><th>Result and notes</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>1. Build only, cold</td><td><input type="text" data-note="p1d" placeholder="m:ss"></td><td><input type="text" data-note="p1n" placeholder="pass / fail"></td></tr>
+                <tr><td>2. Build only, cached</td><td><input type="text" data-note="p2d" placeholder="m:ss"></td><td><input type="text" data-note="p2n" placeholder="pass / fail"></td></tr>
+                <tr><td>3. Tests on a service container</td><td><input type="text" data-note="p3d" placeholder="m:ss"></td><td><input type="text" data-note="p3n" placeholder="pass / fail"></td></tr>
+                <tr><td>4. Vulnerability scan added</td><td><input type="text" data-note="p4d" placeholder="m:ss"></td><td><input type="text" data-note="p4n" placeholder="pass / fail"></td></tr>
+                <tr><td>5. Pushed to GHCR</td><td><input type="text" data-note="p5d" placeholder="m:ss"></td><td><input type="text" data-note="p5n" placeholder="pass / fail"></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h4" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h4">Derive tags instead of writing them</label>
+            <p class="item-hint">One action produces the whole tag set from the event: a SHA tag always, a PR tag on pull requests, and <code>latest</code> only on the default branch. Read the step's output in the log to see exactly what it generated.</p>
+            <div class="cmd file"><code>      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=pr
+            type=raw,value=latest,enable={{is_default_branch}}</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h5" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h5">Assemble the full job: permissions, login, scan, push</label>
+            <p class="item-hint">Two build steps, deliberately. The first loads a single-architecture image onto the runner so the scanner has something local to inspect. The second pushes and hits the cache, so it costs seconds. You can't combine <code>load</code> with a multi-platform build, which is why this shape is standard.</p>
+            <p class="filename">.github/workflows/container.yml — the image job</p>
+            <div class="cmd file"><code>  image:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: github.event_name != 'pull_request'
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Derive tags
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}
+          tags: |
+            type=sha,prefix=sha-
+            type=ref,event=pr
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build for scanning
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: app:ci
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}
+
+      - name: Scan for vulnerabilities
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: app:ci
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: "1"
+
+      - name: Build and push
+        if: github.event_name != 'pull_request'
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          build-args: |
+            NEXT_PUBLIC_API_URL=${{ vars.NEXT_PUBLIC_API_URL }}</code><button class="copy" type="button">Copy</button></div>
+            <p class="alt">Set <code>NEXT_PUBLIC_API_URL</code> under Settings, then Actions, then Variables. It's configuration rather than a secret, and it belongs where session 8 concluded it belongs.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h6" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h6">Test against a real database in the pipeline</label>
+            <p class="item-hint">A second job with a service container. Note the connection string uses <code>localhost</code> — these steps run on the runner, and the service's port is published to it. The healthcheck options are the same idea as session 7's, expressed in Actions syntax.</p>
+            <p class="filename">.github/workflows/container.yml — the test job</p>
+            <div class="cmd file"><code>  test:
+    runs-on: ubuntu-latest
+    services:
+      mongo:
+        image: mongo:7
+        ports:
+          - 27017:27017
+        options: >-
+          --health-cmd "mongosh --quiet --eval 'db.runCommand({ping:1})'"
+          --health-interval 5s
+          --health-timeout 3s
+          --health-retries 10
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
+        env:
+          MONGO_URL: mongodb://localhost:27017/test</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h6" rows="2" placeholder="Did the tests find the database first try? If not, what was the error?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h7" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h7">Make the scan fail on purpose, then decide your policy</label>
+            <p class="item-hint">With <code>exit-code: "1"</code> a high-severity finding stops the pipeline. Try it against a deliberately old base image to see a real failure, then read the report. <code>ignore-unfixed</code> matters: blocking on vulnerabilities with no available patch means blocking forever, which teaches people to disable the scan.</p>
+            <div class="cmd"><code>docker run --rm aquasec/trivy image node:18-alpine --severity HIGH,CRITICAL</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h7" rows="2" placeholder="What will you block on, and what will you merely report?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h8" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h8">Remove the permissions block and read the 403</label>
+            <p class="item-hint">Delete <code>packages: write</code>, merge to main, and watch the push fail with a denial that says nothing about permissions. This is the single most common first-time GHCR failure, and recognising the message saves you a long search.</p>
+            <div class="cmd"><code>gh run view --log-failed
+# then put the permissions block back and re-run</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h8" rows="2" placeholder="Paste the exact error line so future-you recognises it:"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h9" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h9">Pull your own published image back down</label>
+            <p class="item-hint">New GHCR packages are private by default, so link the package to the repository and set its visibility in the package settings if you want it visible on your profile. Then pull it by SHA tag and run it — this is the artifact session 10 deploys, and confirming it runs on your machine first is worth two minutes.</p>
+            <div class="cmd"><code>docker pull ghcr.io/YOUR_USER/YOUR_REPO:latest
+docker image inspect ghcr.io/YOUR_USER/YOUR_REPO:latest --format '{{.Architecture}}'
+docker run --rm -p 3000:3000 ghcr.io/YOUR_USER/YOUR_REPO:latest</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h9" rows="2" placeholder="Package URL, and the SHA tag of the image you just pulled:"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h3>Deliverable</h3>
+        <span class="count" data-count="ship">0/3</span>
+      </div>
+      <p class="block-note">A green badge on a repo that builds, tests, scans and publishes a container is a stronger signal than most frontend portfolios carry. It's also the thing to point at in an interview.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d1" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d1">Merge the workflow and put the badge in the README</label>
+            <p class="item-hint">Badge plus two sentences on what the pipeline does. Someone skimming your repo should understand the whole thing without opening the YAML.</p>
+            <div class="cmd file"><code>![container](https://github.com/YOUR_USER/YOUR_REPO/actions/workflows/container.yml/badge.svg)</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note tall" data-note="d1" rows="5" placeholder="## Pipeline&#10;Every merge to main builds a multi-arch image, runs tests against…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d2" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d2">Write your tagging and promotion policy down</label>
+            <p class="item-hint">Which tags get created, which one a deploy references, and how you'd roll back. Write it before session 10 needs it, because "which image do I actually deploy" is the first question that session asks.</p>
+            <textarea class="note" data-note="d2" rows="4" placeholder="Tags created:&#10;Deploys reference:&#10;Rollback procedure:&#10;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d3" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d3">Record the cache saving and commit</label>
+            <p class="item-hint">Rows 1 and 2 of the ledger. It's a concrete engineering result and it belongs next to the image size numbers from session 5.</p>
+            <textarea class="note" data-note="d3" rows="2" placeholder="One open question to bring into session 10:"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="pitfall">
+        <p><b>Two that will stop your first push.</b></p>
+        <p>Without <code>permissions: packages: write</code> on the job, the push fails with a denial about installation or access rather than anything mentioning permissions. The default token is read-only and nothing warns you until the very last step, after a full build.</p>
+        <p>A cache is not a guarantee. <code>type=gha</code> caches are scoped per branch with fallback to the default branch, and GitHub evicts them under a size limit, so a run you expected to be fast occasionally isn't. Don't treat a slow run as a broken pipeline until you've checked whether the cache was there.</p>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn" type="button" id="export">Copy to notes.md</button>
+        <button class="btn ghost" type="button" id="complete">Mark session 9 complete</button>
+        <button class="btn quiet" type="button" id="reset">Clear saved work</button>
+        <span class="status" id="status"></span>
+      </div>
+    </section>
+  </main>
+
+  <aside class="tracker">
+    <h3>Course stack</h3>
+    <p class="lede">Ten layers on top of scratch. Session 9 fills as you tick items.</p>
+
+    <div class="crown" id="crown">docker-course:incomplete</div>
+    <div class="stack" id="stack"></div>
+    <div class="foot">FROM scratch</div>
+
+    <p class="tracker-meta" id="tracker-meta">0 of 10 sessions closed.</p>
+  </aside>
+</div>
+
+<script>
+  const SESSIONS = [
+    "The container mental model",
+    "Images, layers, and the CLI",
+    "Your first Dockerfile",
+    "Containerizing React and Next.js",
+    "Multi-stage builds and optimization",
+    "Volumes and persistence",
+    "Networking and Docker Compose",
+    "Configuration and secrets",
+    "Docker in CI/CD",
+    "Running containers in production"
+  ];
+
+  const THIS_SESSION = 9;
+  const KEY = "docker-course:session-9";
+  const BLOCK_TITLES = { theory: "Theory", lab: "Hands-on", ship: "Deliverable" };
+
+  const LEDGER_ROWS = [
+    ["Build only, cold", "p1d", "p1n"],
+    ["Build only, cached", "p2d", "p2n"],
+    ["Tests on a service container", "p3d", "p3n"],
+    ["Vulnerability scan added", "p4d", "p4n"],
+    ["Pushed to GHCR", "p5d", "p5n"]
+  ];
+
+  // sessions 1 to 7 assumed behind you — untick them if that's wrong
+  let state = {
+    ticks: {},
+    notes: {},
+    sessions: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true }
+  };
+  let saveTimer = null;
+
+  const ticks    = Array.from(document.querySelectorAll(".tick"));
+  const fields   = Array.from(document.querySelectorAll("[data-note]"));
+  const statusEl = document.getElementById("status");
+
+  async function load() {
+    try {
+      const res = await window.storage.get(KEY);
+      if (res && res.value) {
+        const saved = JSON.parse(res.value);
+        state = Object.assign({ ticks: {}, notes: {}, sessions: {} }, saved);
+      }
+    } catch (e) {
+      // nothing saved yet, or storage unavailable — carry on with a blank sheet
+    }
+    hydrate();
+  }
+
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      try {
+        await window.storage.set(KEY, JSON.stringify(state));
+        flash("saved");
+      } catch (e) {
+        flash("not saved — working in this tab only");
+      }
+    }, 400);
+  }
+
+  function flash(msg) {
+    statusEl.textContent = msg;
+    statusEl.classList.add("show");
+    setTimeout(() => statusEl.classList.remove("show"), 1600);
+  }
+
+  function hydrate() {
+    ticks.forEach(t => { t.checked = !!state.ticks[t.id]; });
+    fields.forEach(f => { f.value = state.notes[f.dataset.note] || ""; });
+    render();
+  }
+
+  ticks.forEach(t => {
+    t.addEventListener("change", () => {
+      state.ticks[t.id] = t.checked;
+      render();
+      save();
+    });
+  });
+
+  fields.forEach(f => {
+    f.addEventListener("input", () => {
+      state.notes[f.dataset.note] = f.value;
+      save();
+    });
+  });
+
+  document.querySelectorAll(".copy").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const text = btn.parentElement.querySelector("code").textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = "Copied";
+      } catch (e) {
+        btn.textContent = "Select it";
+      }
+      setTimeout(() => { btn.textContent = "Copy"; }, 1400);
+    });
+  });
+
+  const stackEl = document.getElementById("stack");
+
+  SESSIONS.forEach((name, i) => {
+    const n = i + 1;
+    const row = document.createElement("div");
+    row.className = "layer";
+    row.dataset.session = n;
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.innerHTML =
+      '<div class="layer-fill"></div>' +
+      '<span class="layer-no">' + String(n).padStart(2, "0") + '</span>' +
+      '<span class="layer-name">' + name + '</span>' +
+      '<span class="layer-mark"></span>';
+
+    const toggle = () => {
+      state.sessions[n] = !state.sessions[n];
+      render();
+      save();
+    };
+
+    row.addEventListener("click", toggle);
+    row.addEventListener("keydown", ev => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); }
+    });
+
+    stackEl.appendChild(row);
+  });
+
+  function render() {
+    const total = ticks.length;
+    const done = ticks.filter(t => t.checked).length;
+
+    document.getElementById("gauge-fill").style.width = (done / total * 100) + "%";
+    document.getElementById("gauge-label").textContent = done + "/" + total;
+
+    document.querySelectorAll("[data-count]").forEach(el => {
+      const block = el.dataset.count;
+      const group = ticks.filter(t => t.dataset.block === block);
+      el.textContent = group.filter(t => t.checked).length + "/" + group.length;
+    });
+
+    const closed = Object.values(state.sessions).filter(Boolean).length;
+
+    document.querySelectorAll(".layer").forEach(row => {
+      const n = Number(row.dataset.session);
+      const isDone = !!state.sessions[n];
+      row.classList.toggle("done", isDone);
+      row.classList.toggle("current", n === THIS_SESSION && !isDone);
+      const pct = isDone ? 100 : (n === THIS_SESSION ? done / total * 100 : 0);
+      row.querySelector(".layer-fill").style.width = pct + "%";
+      row.setAttribute("aria-pressed", String(isDone));
+    });
+
+    const crown = document.getElementById("crown");
+    crown.textContent = closed === 10 ? "docker-course:v1  built" : "docker-course:incomplete";
+    crown.classList.toggle("earned", closed === 10);
+
+    document.getElementById("tracker-meta").textContent = closed + " of 10 sessions closed.";
+  }
+
+  document.getElementById("complete").addEventListener("click", () => {
+    state.sessions[THIS_SESSION] = true;
+    render();
+    save();
+    flash("session 9 closed");
+  });
+
+  document.getElementById("reset").addEventListener("click", async () => {
+    if (!confirm("Clear every tick and note on this sheet?")) return;
+    state = {
+      ticks: {},
+      notes: {},
+      sessions: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true }
+    };
+    try { await window.storage.delete(KEY); } catch (e) {}
+    hydrate();
+    flash("cleared");
+  });
+
+  document.getElementById("export").addEventListener("click", async () => {
+    const total = ticks.length;
+    const done = ticks.filter(t => t.checked).length;
+
+    let md = "# Session 9 — Docker in CI/CD with GitHub Actions\n\n";
+    md += "Progress: " + done + "/" + total + " items\n";
+
+    let current = null;
+    ticks.forEach(t => {
+      if (t.dataset.block !== current) {
+        current = t.dataset.block;
+        md += "\n## " + BLOCK_TITLES[current] + "\n\n";
+      }
+      const label = t.parentElement.querySelector(".item-label").textContent.trim();
+      md += "- [" + (t.checked ? "x" : " ") + "] " + label + "\n";
+
+      if (t.id === "h3") {
+        md += "\n  | Run | Duration | Result |\n  |---|---|---|\n";
+        LEDGER_ROWS.forEach(r => {
+          md += "  | " + r[0] + " | " + (state.notes[r[1]] || "—") +
+                " | " + (state.notes[r[2]] || "—") + " |\n";
+        });
+        md += "\n";
+        return;
+      }
+
+      const note = (state.notes[t.id] || "").trim();
+      if (note) {
+        note.split("\n").forEach(line => { md += "  > " + line + "\n"; });
+      }
+    });
+
+    md += "\n";
+
+    try {
+      await navigator.clipboard.writeText(md);
+      flash("markdown copied");
+    } catch (e) {
+      flash("clipboard blocked — copy manually");
+      console.log(md);
+    }
+  });
+
+  load();
+</script>

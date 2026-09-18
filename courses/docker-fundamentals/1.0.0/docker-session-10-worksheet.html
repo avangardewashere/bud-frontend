@@ -1,0 +1,1135 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker course — Session 10 manifest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --paper:      #DDE3E7;
+    --paper-lift: #EAEFF1;
+    --field:      #F4F7F8;
+    --ink:        #12293D;
+    --ink-soft:   #4E6478;
+    --rule:       #B2BFC8;
+    --rule-fine:  #C6D1D8;
+    --blue:       #1E6FA8;
+    --blue-deep:  #0E4772;
+    --oxide:      #9A4620;
+
+    --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --s1: 0.8125rem;
+    --s2: 0.9375rem;
+    --s3: 1.0625rem;
+    --s4: 1.3125rem;
+    --s6: 2.125rem;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { background: var(--paper); }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--s2);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  .masthead { border-bottom: 2px solid var(--ink); background: var(--paper-lift); }
+
+  .masthead-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 18px 24px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 20px;
+  }
+
+  .masthead h1 {
+    margin: 0;
+    font-size: var(--s3);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .masthead .sub { font-size: var(--s1); color: var(--ink-soft); }
+
+  .masthead .gauge {
+    flex: 1 1 200px;
+    min-width: 160px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: var(--s1);
+  }
+
+  .gauge-track {
+    flex: 1;
+    height: 8px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+  }
+
+  .gauge-fill {
+    height: 100%;
+    width: 0;
+    background: var(--blue);
+    transition: width 220ms ease;
+  }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 80px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 44px;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .shell {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 40px;
+      padding: 22px 18px 60px;
+    }
+  }
+
+  .manifest {
+    border: 2px solid var(--ink);
+    background: var(--paper-lift);
+    margin-bottom: 38px;
+  }
+
+  .manifest-top {
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .manifest-no {
+    border-right: 1px solid var(--rule);
+    padding: 14px 0;
+    text-align: center;
+    font-family: var(--mono);
+  }
+
+  .manifest-no b {
+    display: block;
+    font-size: var(--s6);
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .manifest-no span { font-size: 0.6875rem; color: var(--ink-soft); }
+
+  .manifest-title { padding: 14px 18px; }
+
+  .manifest-title h2 {
+    margin: 0 0 3px;
+    font-size: var(--s4);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .manifest-title p { margin: 0; font-size: var(--s1); color: var(--ink-soft); }
+
+  .budget { display: grid; grid-template-columns: repeat(3, 1fr); }
+
+  .budget div { padding: 10px 14px; font-size: var(--s1); }
+
+  .budget div + div { border-left: 1px solid var(--rule-fine); }
+
+  .budget b { display: block; font-weight: 500; }
+
+  .budget span { font-family: var(--mono); color: var(--ink-soft); font-size: 0.75rem; }
+
+  .block { margin-bottom: 42px; }
+
+  .block-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .block-head h3 { margin: 0; font-size: var(--s3); font-weight: 600; }
+
+  .block-head .count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .block-note {
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    margin: 8px 0 20px;
+    max-width: 62ch;
+  }
+
+  .item { border-bottom: 1px solid var(--rule-fine); padding: 15px 0 17px; }
+
+  .item-row { display: flex; gap: 12px; align-items: flex-start; }
+
+  .tick {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    margin: 3px 0 0;
+    background: var(--field);
+    border: 1.5px solid var(--ink-soft);
+    cursor: pointer;
+    position: relative;
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+
+  .tick:checked { background: var(--blue); border-color: var(--blue-deep); }
+
+  .tick:checked::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    background: var(--paper-lift);
+  }
+
+  .item-body { flex: 1 1 auto; min-width: 0; }
+
+  .item-label { font-size: var(--s2); cursor: pointer; display: block; }
+
+  .tick:checked ~ .item-body .item-label { color: var(--ink-soft); }
+
+  .item-hint {
+    margin: 5px 0 0;
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+
+  .cmd {
+    margin-top: 9px;
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--rule);
+    background: var(--field);
+  }
+
+  .cmd code {
+    flex: 1 1 auto;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    padding: 8px 11px;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--blue-deep);
+  }
+
+  .cmd.file { border-left: 3px solid var(--ink-soft); }
+
+  .cmd.file code { color: var(--ink); }
+
+  .copy {
+    flex: 0 0 auto;
+    border: 0;
+    border-left: 1px solid var(--rule);
+    background: transparent;
+    font-family: var(--sans);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 0 10px;
+    cursor: pointer;
+  }
+
+  .copy:hover { background: var(--paper); color: var(--ink); }
+
+  .filename {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    margin: 12px 0 0;
+  }
+
+  .alt {
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    margin: 8px 0 0;
+    padding-left: 11px;
+    border-left: 2px solid var(--rule);
+    max-width: 62ch;
+  }
+
+  .alt code { font-family: var(--mono); }
+
+  .note {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 9px 11px;
+    font-family: var(--sans);
+    font-size: var(--s2);
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--field);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--blue);
+    resize: vertical;
+  }
+
+  .note::placeholder { color: #8496A3; }
+
+  .note.tall { min-height: 150px; }
+
+  .measure {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    border: 1px solid var(--rule);
+    background: var(--field);
+  }
+
+  .measure th,
+  .measure td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--rule-fine);
+    font-size: var(--s1);
+    vertical-align: top;
+  }
+
+  .measure th { font-weight: 500; color: var(--ink-soft); }
+
+  .measure tr:last-child td { border-bottom: 0; }
+
+  .measure code { font-family: var(--mono); color: var(--blue-deep); }
+
+  .measure input {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    background: transparent;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    color: var(--ink);
+    padding: 2px 0;
+  }
+
+  .measure .narrow { width: 104px; }
+  .measure .from { width: 74px; font-family: var(--mono); color: var(--ink-soft); }
+
+  .pitfall {
+    border-left: 3px solid var(--oxide);
+    background: var(--paper-lift);
+    padding: 12px 15px;
+    margin-top: 24px;
+    font-size: var(--s1);
+    max-width: 66ch;
+  }
+
+  .pitfall b { font-weight: 600; }
+
+  .pitfall p { margin: 0 0 7px; }
+
+  .pitfall p:last-child { margin-bottom: 0; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 30px;
+    padding-top: 22px;
+    border-top: 1px solid var(--ink);
+  }
+
+  .btn {
+    font-family: var(--sans);
+    font-size: var(--s2);
+    font-weight: 500;
+    padding: 9px 15px;
+    border: 1.5px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper-lift);
+    cursor: pointer;
+  }
+
+  .btn.ghost { background: transparent; color: var(--ink); }
+
+  .btn.ghost:hover { background: var(--paper-lift); }
+
+  .btn.quiet {
+    border-color: var(--rule);
+    background: transparent;
+    color: var(--ink-soft);
+    font-weight: 400;
+  }
+
+  .btn.quiet:hover { color: var(--oxide); border-color: var(--oxide); }
+
+  .status {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+
+  .status.show { opacity: 1; }
+
+  .tracker { position: sticky; top: 22px; }
+
+  @media (max-width: 900px) { .tracker { position: static; } }
+
+  .tracker h3 { margin: 0 0 3px; font-size: var(--s3); font-weight: 600; }
+
+  .tracker .lede { margin: 0 0 16px; font-size: var(--s1); color: var(--ink-soft); }
+
+  .crown {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 6px 9px;
+    border: 1px dashed var(--rule);
+    margin-bottom: 4px;
+  }
+
+  .crown.earned {
+    color: var(--paper-lift);
+    background: var(--blue-deep);
+    border: 1px solid var(--blue-deep);
+  }
+
+  .stack { display: flex; flex-direction: column-reverse; }
+
+  .layer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 10px;
+    margin-top: 2px;
+    background: var(--paper-lift);
+    border: 1px solid var(--rule-fine);
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .layer-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0;
+    background: rgba(30, 111, 168, 0.16);
+    border-right: 1px solid rgba(14, 71, 114, 0.35);
+    transition: width 260ms ease;
+    pointer-events: none;
+  }
+
+  .layer.done { border-color: var(--blue-deep); }
+
+  .layer-no {
+    position: relative;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    flex: 0 0 auto;
+  }
+
+  .layer.done .layer-no { color: var(--blue-deep); }
+
+  .layer-name {
+    position: relative;
+    font-size: var(--s1);
+    line-height: 1.35;
+    flex: 1 1 auto;
+  }
+
+  .layer-mark {
+    position: relative;
+    flex: 0 0 auto;
+    width: 13px;
+    height: 13px;
+    border: 1.5px solid var(--ink-soft);
+    background: var(--field);
+  }
+
+  .layer.done .layer-mark { background: var(--blue); border-color: var(--blue-deep); }
+
+  .layer.current { border-left: 3px solid var(--blue); padding-left: 8px; }
+
+  .foot {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    background: var(--paper);
+    border: 1px solid var(--rule-fine);
+    border-top: 0;
+    margin-top: 2px;
+  }
+
+  .tracker-meta { margin-top: 14px; font-size: var(--s1); color: var(--ink-soft); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <h1>Docker, ten sessions</h1>
+    <span class="sub">Session worksheet and course tracker</span>
+    <div class="gauge">
+      <span id="gauge-label">0/16</span>
+      <div class="gauge-track"><div class="gauge-fill" id="gauge-fill"></div></div>
+      <span>session 10</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <main>
+
+    <section class="manifest">
+      <div class="manifest-top">
+        <div class="manifest-no">
+          <b>10</b>
+          <span>of ten</span>
+        </div>
+        <div class="manifest-title">
+          <h2>Running containers in production</h2>
+          <p>A real server, a real domain, real HTTPS, and a pipeline that deploys on merge. Ends with a URL you can send someone.</p>
+        </div>
+      </div>
+      <div class="budget">
+        <div><b>Theory</b><span>45 min</span></div>
+        <div><b>Hands-on</b><span>120 min</span></div>
+        <div><b>Deliverable</b><span>45 min</span></div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h3>Theory</h3>
+        <span class="count" data-count="theory">0/4</span>
+      </div>
+      <p class="block-note">Nine sessions of things working on machines you control completely. This one is about what happens when nobody is watching and something dies at 3am.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t1" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t1">Restart policies, and the loop they can create</label>
+            <p class="item-hint"><code>always</code> restarts a container even after you deliberately stopped it and rebooted. <code>unless-stopped</code> respects a manual stop, which is almost always what you want. Both interact badly with memory limits: when the kernel kills a process for exceeding its limit the container exits 137, the policy restarts it, and it does the same thing again. A restart policy is not a fix for a container that can't stay up.</p>
+            <textarea class="note" data-note="t1" rows="2" placeholder="How would you tell a crash loop apart from a healthy service that restarted once?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t2" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t2">Logs belong on stdout, and nowhere else</label>
+            <p class="item-hint">Writing a log file inside a container is a mistake in three ways: it grows the writable layer, <code>docker logs</code> can't see it, and it's destroyed with the container. Print to stdout and stderr and let the log driver deal with collection. Then set rotation, because the default json-file driver grows until the disk is full and a full disk takes everything down at once.</p>
+            <textarea class="note" data-note="t2" rows="2" placeholder="Does your app write any log files? Where to?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t3" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t3">One thing terminates TLS, everything else stays internal</label>
+            <p class="item-hint">A reverse proxy holds ports 80 and 443, obtains and renews certificates, and forwards to your services by their Compose service names. Your app never sees a certificate and never needs to — which also means the addressing rule from session 7 is what makes this work. Certificates live in a volume; lose it and you re-issue, which is how people hit rate limits.</p>
+            <textarea class="note" data-note="t3" rows="2" placeholder="Which service keeps its published ports on the server, and which lose them?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t4" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t4">When one box stops being enough</label>
+            <p class="item-hint">Compose on a single server handles far more traffic and far longer than people expect, and it fails in ways you can reason about. You graduate when you need more than one machine, zero-downtime rollouts, or autoscaling — that's what orchestration buys. It costs a control plane, a new vocabulary, and a much larger surface to get wrong. Knowing why you'd move is more valuable than moving early.</p>
+            <textarea class="note" data-note="t4" rows="2" placeholder="What specific thing would have to become true before Kubernetes earns its keep for you?"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h3>Hands-on</h3>
+        <span class="count" data-count="lab">0/9</span>
+      </div>
+      <p class="block-note">You need a small VPS and a domain pointed at it. The cheapest tier anywhere is enough. Set the DNS A record before you start so it has time to propagate.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h1" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h1">Provision the box and close the doors you don't need</label>
+            <p class="item-hint">Docker publishes ports by manipulating iptables directly, which on some setups bypasses the firewall — so never publish a database port on a public server and assume the firewall covers you. Session 7's lesson is now a security control rather than a tidiness preference.</p>
+            <div class="cmd"><code>curl -fsSL https://get.docker.com | sh
+sudo usermod -aG docker $USER
+
+sudo ufw default deny incoming
+sudo ufw allow OpenSSH
+sudo ufw allow 80,443/tcp
+sudo ufw enable
+
+sudo sed -i 's/^#*PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
+sudo systemctl restart ssh</code><button class="copy" type="button">Copy</button></div>
+            <p class="alt">Confirm your SSH key works in a second terminal before you close the first one. Locking yourself out of a fresh box is survivable; locking yourself out of a running one is not.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h2" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h2">Pull the image the pipeline built — don't build on the server</label>
+            <p class="item-hint">A server that builds is a server that needs your source, your dev dependencies and enough RAM to run a bundler. The whole point of session 9 is that the artifact already exists. The <code>IMAGE_TAG</code> variable is how you'll roll back later.</p>
+            <p class="filename">/srv/app/compose.yaml — on the server</p>
+            <div class="cmd file"><code>services:
+  web:
+    image: ghcr.io/YOUR_USER/YOUR_REPO:${IMAGE_TAG:-latest}
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      MONGO_URL: mongodb://db:27017/appdb
+    depends_on:
+      db:
+        condition: service_healthy
+
+  db:
+    image: mongo:7
+    restart: unless-stopped
+    volumes:
+      - app-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.runCommand({ping:1})"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  app-data:</code><button class="copy" type="button">Copy</button></div>
+            <div class="cmd"><code>mkdir -p /srv/app && cd /srv/app
+echo "IMAGE_TAG=latest" > .env
+docker compose pull
+docker compose up -d
+docker compose ps</code><button class="copy" type="button">Copy</button></div>
+            <p class="alt">If the package is private, log in on the server with a read-only personal access token rather than the token you use anywhere else.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h3" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h3">Put Caddy in front and get real HTTPS</label>
+            <p class="item-hint">Two lines of configuration and certificates appear by themselves. Note that <code>web</code> now has no published ports at all — Caddy reaches it by service name, and the only thing listening on the public internet is the proxy. The <code>caddy-data</code> volume holds your certificates; back it up or accept re-issuing them.</p>
+            <p class="filename">/srv/app/Caddyfile</p>
+            <div class="cmd file"><code>app.yourdomain.com {
+  reverse_proxy web:3000
+}</code><button class="copy" type="button">Copy</button></div>
+            <p class="filename">compose.yaml — add the proxy</p>
+            <div class="cmd file"><code>  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on:
+      - web
+
+volumes:
+  app-data:
+  caddy-data:
+  caddy-config:</code><button class="copy" type="button">Copy</button></div>
+            <div class="cmd"><code>docker compose up -d
+docker compose logs -f caddy
+curl -I https://app.yourdomain.com</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h3" rows="2" placeholder="Live URL, and how long the certificate took to issue:"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h4" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h4">Set limits and a healthcheck, then kill it</label>
+            <p class="item-hint">Kill the container and watch it come back within seconds. Then <code>stop</code> it deliberately and watch it stay down — that's the difference between <code>unless-stopped</code> and <code>always</code>, and it's worth seeing rather than reading.</p>
+            <p class="filename">compose.yaml — on the web service</p>
+            <div class="cmd file"><code>    deploy:
+      resources:
+        limits:
+          memory: 512M
+          cpus: "0.75"
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s</code><button class="copy" type="button">Copy</button></div>
+            <div class="cmd"><code>docker compose up -d
+docker stats --no-stream
+docker compose kill web && sleep 8 && docker compose ps
+docker compose stop web && sleep 8 && docker compose ps
+docker compose start web</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h5" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h5">Trigger an out-of-memory kill and read the evidence</label>
+            <p class="item-hint">Exit code 137 and <code>OOMKilled: true</code>. Do this in a throwaway container rather than your live service. The point is recognising the signature — a container that keeps restarting with 137 is being killed for memory, not crashing on a bug, and no amount of code reading will show you that.</p>
+            <div class="cmd"><code>docker run --name oom -m 64m node:22-alpine \
+  node -e "const a=[]; while(true) a.push(Buffer.alloc(1048576))"
+docker inspect oom --format '{{.State.OOMKilled}} {{.State.ExitCode}}'
+docker rm oom</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h5" rows="2" placeholder="What memory limit does your app actually need? How did you find out?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h6" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h6">Cap the logs before they fill the disk</label>
+            <p class="item-hint">Thirty megabytes per service, ceiling enforced. Without this, a chatty service on a small box fills the disk in weeks and everything stops at once — including your ability to SSH in and fix it.</p>
+            <p class="filename">compose.yaml — on every service</p>
+            <div class="cmd file"><code>    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"</code><button class="copy" type="button">Copy</button></div>
+            <div class="cmd"><code>docker compose up -d
+docker compose logs --tail 20 web
+sudo du -sh /var/lib/docker/containers
+df -h /</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h7" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h7">Harden the container and find out what breaks</label>
+            <p class="item-hint">A read-only root filesystem is the strongest single control here, and it will break your app the first time — Next.js needs a writable cache directory, so that goes in a tmpfs. Apply these one at a time and load the site after each, or you won't know which one caused the failure.</p>
+            <p class="filename">compose.yaml — on the web service</p>
+            <div class="cmd file"><code>    read_only: true
+    tmpfs:
+      - /tmp
+      - /app/.next/cache
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true</code><button class="copy" type="button">Copy</button></div>
+            <div class="cmd"><code>docker compose up -d web
+docker compose logs web | tail -20
+curl -I https://app.yourdomain.com
+docker compose exec web whoami</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h7" rows="2" placeholder="Which control broke something, and what did you have to allow back?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h8" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h8">Make merging to main deploy the build</label>
+            <p class="item-hint">The deploy job writes the SHA tag into the server's <code>.env</code>, pulls, and restarts. Deploying by SHA rather than <code>latest</code> is what makes rollback a one-line edit instead of a rebuild. Verify the tag format against your packages page first — the metadata step abbreviates the SHA.</p>
+            <p class="filename">.github/workflows/container.yml — new job</p>
+            <div class="cmd file"><code>  deploy:
+    needs: [image, test]
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Pull and restart on the server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.DEPLOY_HOST }}
+          username: ${{ secrets.DEPLOY_USER }}
+          key: ${{ secrets.DEPLOY_SSH_KEY }}
+          script: |
+            cd /srv/app
+            echo "IMAGE_TAG=sha-$(echo ${{ github.sha }} | cut -c1-7)" > .env
+            docker compose pull
+            docker compose up -d
+            docker image prune -f</code><button class="copy" type="button">Copy</button></div>
+            <div class="cmd"><code># then prove rollback works, on the server:
+cat .env
+echo "IMAGE_TAG=sha-PREVIOUS" > .env
+docker compose up -d
+curl -I https://app.yourdomain.com</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h8" rows="2" placeholder="How long from merge to live? Did the rollback work?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h9" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h9">Audit what you've built</label>
+            <p class="item-hint">Most of this was already done in earlier sessions — that's the point of running the audit at the end rather than treating hardening as a separate phase. Mark anything you skipped honestly; a deferred control you know about is fine, one you've forgotten isn't.</p>
+            <table class="measure">
+              <thead>
+                <tr><th>Control</th><th class="from">From</th><th class="narrow">Applied?</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Runs as a non-root user</td><td class="from">s5</td><td><input type="text" data-note="k1" placeholder="yes / no"></td></tr>
+                <tr><td>Minimal base image</td><td class="from">s5</td><td><input type="text" data-note="k2" placeholder="yes / no"></td></tr>
+                <tr><td>Base image pinned by digest</td><td class="from">s2</td><td><input type="text" data-note="k3" placeholder="yes / no"></td></tr>
+                <tr><td>Database port not published</td><td class="from">s7</td><td><input type="text" data-note="k4" placeholder="yes / no"></td></tr>
+                <tr><td>No secrets in the image</td><td class="from">s8</td><td><input type="text" data-note="k5" placeholder="yes / no"></td></tr>
+                <tr><td>Image scanned in CI</td><td class="from">s9</td><td><input type="text" data-note="k6" placeholder="yes / no"></td></tr>
+                <tr><td>Restart policy set</td><td class="from">s10</td><td><input type="text" data-note="k7" placeholder="yes / no"></td></tr>
+                <tr><td>Memory and CPU limits set</td><td class="from">s10</td><td><input type="text" data-note="k8" placeholder="yes / no"></td></tr>
+                <tr><td>Log rotation configured</td><td class="from">s10</td><td><input type="text" data-note="k9" placeholder="yes / no"></td></tr>
+                <tr><td>Read-only filesystem, caps dropped</td><td class="from">s10</td><td><input type="text" data-note="k10" placeholder="yes / no"></td></tr>
+                <tr><td>HTTPS with a valid certificate</td><td class="from">s10</td><td><input type="text" data-note="k11" placeholder="yes / no"></td></tr>
+                <tr><td>Database volume backed up</td><td class="from">s6</td><td><input type="text" data-note="k12" placeholder="yes / no"></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="block">
+      <div class="block-head">
+        <h3>Deliverable</h3>
+        <span class="count" data-count="ship">0/3</span>
+      </div>
+      <p class="block-note">Last one. What you're producing here is the thing you point at when someone asks whether a frontend developer can ship infrastructure.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d1" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d1">Write the README that ties all ten sessions together</label>
+            <p class="item-hint">Live URL, the architecture in four or five lines, the pipeline, the deploy flow, and the image size and build-time numbers you measured in sessions 5 and 9. Numbers you took yourself read as engineering; adjectives read as a tutorial.</p>
+            <textarea class="note tall" data-note="d1" rows="7" placeholder="# PROJECT&#10;Live: https://&#10;&#10;## Architecture&#10;Caddy terminates TLS and proxies to…&#10;&#10;## Pipeline&#10;&#10;## Numbers&#10;Production image: XXX MB (from YYY MB). Cached CI build: X:XX.&#10;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d2" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d2">Write the runbook — four procedures, one page</label>
+            <p class="item-hint">Deploy, roll back, read logs, restore the database. Write it for yourself at 2am with no context. Everything in it is a command you ran this session or in session 6, so this is transcription rather than invention, and it's the single most useful page in the repo.</p>
+            <textarea class="note tall" data-note="d2" rows="6" placeholder="## Deploy&#10;## Roll back&#10;## Read logs&#10;## Restore the database&#10;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d3" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d3">Close the course and pick what's next</label>
+            <p class="item-hint">Four onward paths: Kubernetes for orchestration, Terraform to provision the box you just configured by hand, Prometheus and Grafana for observability, or image signing and SBOMs for supply chain. Pick one and write down why — a decision with a reason behind it outlasts a list of options.</p>
+            <textarea class="note" data-note="d3" rows="3" placeholder="Next: &#10;Because: &#10;The thing from these ten sessions I'll use most: "></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="pitfall">
+        <p><b>Three things to know before you leave this running.</b></p>
+        <p>Docker writes its own iptables rules, so a published port can be reachable from the internet even when your firewall says otherwise. The protection that actually holds is not publishing the port in the first place — which is why the database has no <code>ports</code> entry.</p>
+        <p>The <code>caddy-data</code> volume holds your certificates and their renewal state. Delete it casually and you re-request certificates, and Let's Encrypt rate limits are per-domain and per-week. Treat it like the database volume.</p>
+        <p>You now own a database. Session 6 gave you the backup command; nothing runs it on a schedule unless you set that up. An untested backup is a guess, so restore it once into a throwaway container and confirm the data is really there.</p>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn" type="button" id="export">Copy to notes.md</button>
+        <button class="btn ghost" type="button" id="complete">Mark session 10 complete</button>
+        <button class="btn quiet" type="button" id="reset">Clear saved work</button>
+        <span class="status" id="status"></span>
+      </div>
+    </section>
+  </main>
+
+  <aside class="tracker">
+    <h3>Course stack</h3>
+    <p class="lede">Ten layers on top of scratch. Close this one and the image is built.</p>
+
+    <div class="crown" id="crown">docker-course:incomplete</div>
+    <div class="stack" id="stack"></div>
+    <div class="foot">FROM scratch</div>
+
+    <p class="tracker-meta" id="tracker-meta">0 of 10 sessions closed.</p>
+  </aside>
+</div>
+
+<script>
+  const SESSIONS = [
+    "The container mental model",
+    "Images, layers, and the CLI",
+    "Your first Dockerfile",
+    "Containerizing React and Next.js",
+    "Multi-stage builds and optimization",
+    "Volumes and persistence",
+    "Networking and Docker Compose",
+    "Configuration and secrets",
+    "Docker in CI/CD",
+    "Running containers in production"
+  ];
+
+  const THIS_SESSION = 10;
+  const KEY = "docker-course:session-10";
+  const BLOCK_TITLES = { theory: "Theory", lab: "Hands-on", ship: "Deliverable" };
+
+  const AUDIT_ROWS = [
+    ["Runs as a non-root user", "s5", "k1"],
+    ["Minimal base image", "s5", "k2"],
+    ["Base image pinned by digest", "s2", "k3"],
+    ["Database port not published", "s7", "k4"],
+    ["No secrets in the image", "s8", "k5"],
+    ["Image scanned in CI", "s9", "k6"],
+    ["Restart policy set", "s10", "k7"],
+    ["Memory and CPU limits set", "s10", "k8"],
+    ["Log rotation configured", "s10", "k9"],
+    ["Read-only filesystem, caps dropped", "s10", "k10"],
+    ["HTTPS with a valid certificate", "s10", "k11"],
+    ["Database volume backed up", "s6", "k12"]
+  ];
+
+  // sessions 1 to 7 assumed behind you — untick them if that's wrong
+  let state = {
+    ticks: {},
+    notes: {},
+    sessions: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true, 9: true }
+  };
+  let saveTimer = null;
+
+  const ticks    = Array.from(document.querySelectorAll(".tick"));
+  const fields   = Array.from(document.querySelectorAll("[data-note]"));
+  const statusEl = document.getElementById("status");
+
+  async function load() {
+    try {
+      const res = await window.storage.get(KEY);
+      if (res && res.value) {
+        const saved = JSON.parse(res.value);
+        state = Object.assign({ ticks: {}, notes: {}, sessions: {} }, saved);
+      }
+    } catch (e) {
+      // nothing saved yet, or storage unavailable — carry on with a blank sheet
+    }
+    hydrate();
+  }
+
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      try {
+        await window.storage.set(KEY, JSON.stringify(state));
+        flash("saved");
+      } catch (e) {
+        flash("not saved — working in this tab only");
+      }
+    }, 400);
+  }
+
+  function flash(msg) {
+    statusEl.textContent = msg;
+    statusEl.classList.add("show");
+    setTimeout(() => statusEl.classList.remove("show"), 1600);
+  }
+
+  function hydrate() {
+    ticks.forEach(t => { t.checked = !!state.ticks[t.id]; });
+    fields.forEach(f => { f.value = state.notes[f.dataset.note] || ""; });
+    render();
+  }
+
+  ticks.forEach(t => {
+    t.addEventListener("change", () => {
+      state.ticks[t.id] = t.checked;
+      render();
+      save();
+    });
+  });
+
+  fields.forEach(f => {
+    f.addEventListener("input", () => {
+      state.notes[f.dataset.note] = f.value;
+      save();
+    });
+  });
+
+  document.querySelectorAll(".copy").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const text = btn.parentElement.querySelector("code").textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = "Copied";
+      } catch (e) {
+        btn.textContent = "Select it";
+      }
+      setTimeout(() => { btn.textContent = "Copy"; }, 1400);
+    });
+  });
+
+  const stackEl = document.getElementById("stack");
+
+  SESSIONS.forEach((name, i) => {
+    const n = i + 1;
+    const row = document.createElement("div");
+    row.className = "layer";
+    row.dataset.session = n;
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.innerHTML =
+      '<div class="layer-fill"></div>' +
+      '<span class="layer-no">' + String(n).padStart(2, "0") + '</span>' +
+      '<span class="layer-name">' + name + '</span>' +
+      '<span class="layer-mark"></span>';
+
+    const toggle = () => {
+      state.sessions[n] = !state.sessions[n];
+      render();
+      save();
+    };
+
+    row.addEventListener("click", toggle);
+    row.addEventListener("keydown", ev => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); }
+    });
+
+    stackEl.appendChild(row);
+  });
+
+  function render() {
+    const total = ticks.length;
+    const done = ticks.filter(t => t.checked).length;
+
+    document.getElementById("gauge-fill").style.width = (done / total * 100) + "%";
+    document.getElementById("gauge-label").textContent = done + "/" + total;
+
+    document.querySelectorAll("[data-count]").forEach(el => {
+      const block = el.dataset.count;
+      const group = ticks.filter(t => t.dataset.block === block);
+      el.textContent = group.filter(t => t.checked).length + "/" + group.length;
+    });
+
+    const closed = Object.values(state.sessions).filter(Boolean).length;
+
+    document.querySelectorAll(".layer").forEach(row => {
+      const n = Number(row.dataset.session);
+      const isDone = !!state.sessions[n];
+      row.classList.toggle("done", isDone);
+      row.classList.toggle("current", n === THIS_SESSION && !isDone);
+      const pct = isDone ? 100 : (n === THIS_SESSION ? done / total * 100 : 0);
+      row.querySelector(".layer-fill").style.width = pct + "%";
+      row.setAttribute("aria-pressed", String(isDone));
+    });
+
+    const crown = document.getElementById("crown");
+    crown.textContent = closed === 10 ? "docker-course:v1  built" : "docker-course:incomplete";
+    crown.classList.toggle("earned", closed === 10);
+
+    document.getElementById("tracker-meta").textContent = closed + " of 10 sessions closed.";
+  }
+
+  document.getElementById("complete").addEventListener("click", () => {
+    state.sessions[THIS_SESSION] = true;
+    render();
+    save();
+    flash("session 10 closed");
+  });
+
+  document.getElementById("reset").addEventListener("click", async () => {
+    if (!confirm("Clear every tick and note on this sheet?")) return;
+    state = {
+      ticks: {},
+      notes: {},
+      sessions: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true, 7: true, 8: true, 9: true }
+    };
+    try { await window.storage.delete(KEY); } catch (e) {}
+    hydrate();
+    flash("cleared");
+  });
+
+  document.getElementById("export").addEventListener("click", async () => {
+    const total = ticks.length;
+    const done = ticks.filter(t => t.checked).length;
+
+    let md = "# Session 10 — Running containers in production\n\n";
+    md += "Progress: " + done + "/" + total + " items\n";
+
+    let current = null;
+    ticks.forEach(t => {
+      if (t.dataset.block !== current) {
+        current = t.dataset.block;
+        md += "\n## " + BLOCK_TITLES[current] + "\n\n";
+      }
+      const label = t.parentElement.querySelector(".item-label").textContent.trim();
+      md += "- [" + (t.checked ? "x" : " ") + "] " + label + "\n";
+
+      if (t.id === "h9") {
+        md += "\n  | Control | From | Applied? |\n  |---|---|---|\n";
+        AUDIT_ROWS.forEach(r => {
+          md += "  | " + r[0] + " | " + r[1] + " | " +
+                (state.notes[r[2]] || "—") + " |\n";
+        });
+        md += "\n";
+        return;
+      }
+
+      const note = (state.notes[t.id] || "").trim();
+      if (note) {
+        note.split("\n").forEach(line => { md += "  > " + line + "\n"; });
+      }
+    });
+
+    md += "\n";
+
+    try {
+      await navigator.clipboard.writeText(md);
+      flash("markdown copied");
+    } catch (e) {
+      flash("clipboard blocked — copy manually");
+      console.log(md);
+    }
+  });
+
+  load();
+</script>

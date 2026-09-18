@@ -1,0 +1,134 @@
+@import "tailwindcss";
+
+/* ---------------------------------------------------------------------------
+   Bud design tokens — Design.md §4, §5, §6, §12.
+   Green is structure, gold is celebration. Backgrounds are Paper, not white.
+   --------------------------------------------------------------------------- */
+
+@theme {
+  --color-leaf-50: #ecfdf5;
+  --color-leaf-100: #d1fae5;
+  --color-leaf-400: #34d399;
+  --color-leaf-500: #10b981;
+  --color-leaf-600: #059669;
+  --color-leaf-700: #047857;
+  --color-leaf-900: #064e3b;
+
+  --color-gold-300: #fcd34d;
+  --color-gold-400: #fbbf24;
+  --color-gold-600: #d97706;
+
+  --color-paper: #fafaf7;
+  --color-stone-100: #f5f5f4;
+  --color-stone-300: #d6d3d1;
+  --color-stone-500: #78716c;
+  --color-ink: #14201b;
+  --color-soil: #1c1917;
+  --color-soil-lift: #292524;
+
+  --font-display: var(--font-nunito), system-ui, sans-serif;
+  --font-sans: var(--font-nunito-sans), system-ui, sans-serif;
+  --font-mono: var(--font-jetbrains-mono), ui-monospace, monospace;
+
+  --radius-card: 12px;
+  --radius-panel: 16px;
+
+  /* Design.md §6 — slow and organic. */
+  --ease-bud: cubic-bezier(0.22, 0.61, 0.36, 1);
+}
+
+/* ---------------------------------------------------------------------------
+   Semantic layer (the shadcn/ui mapping in Design.md §12).
+   Components reference these, never the raw palette, so dark mode is a data
+   attribute flip rather than a rewrite.
+
+   Dark values are defined but nothing sets data-theme="dark" in v0 — dark mode
+   is Phase 2. There is deliberately no prefers-color-scheme rule: the shell
+   ships light until the toggle exists.
+   --------------------------------------------------------------------------- */
+
+:root {
+  --background: var(--color-paper);
+  --foreground: var(--color-ink);
+  --card: #ffffff;
+  --card-foreground: var(--color-ink);
+  --muted: var(--color-stone-100);
+  --muted-foreground: var(--color-stone-500);
+  --border: var(--color-stone-300);
+  --primary: var(--color-leaf-700);
+  --primary-foreground: #ffffff;
+  --accent: var(--color-gold-400);
+  --accent-foreground: var(--color-ink);
+  --tint: var(--color-leaf-50);
+  --tint-foreground: var(--color-leaf-700);
+  --ring: var(--color-leaf-500);
+  --danger: #e11d48;
+}
+
+:root[data-theme="dark"] {
+  --background: var(--color-soil);
+  --foreground: var(--color-stone-100);
+  --card: var(--color-soil-lift);
+  --card-foreground: var(--color-stone-100);
+  --muted: var(--color-soil-lift);
+  --muted-foreground: var(--color-stone-500);
+  --border: #3a3532;
+  --primary: var(--color-leaf-400);
+  --primary-foreground: var(--color-soil);
+  --accent: var(--color-gold-400);
+  --accent-foreground: var(--color-soil);
+  --tint: #123326;
+  --tint-foreground: var(--color-leaf-400);
+  --ring: var(--color-leaf-400);
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-border: var(--border);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-tint: var(--tint);
+  --color-tint-foreground: var(--tint-foreground);
+  --color-ring: var(--ring);
+  --color-danger: var(--danger);
+}
+
+@layer base {
+  html {
+    -webkit-text-size-adjust: 100%;
+  }
+
+  body {
+    background-color: var(--background);
+    color: var(--foreground);
+    font-family: var(--font-sans);
+    line-height: 1.6;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: var(--font-display);
+    font-weight: 800;
+    line-height: 1.15;
+    letter-spacing: -0.01em;
+  }
+
+  /* Design.md §6 — reduced motion swaps movement for opacity. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+    }
+  }
+}

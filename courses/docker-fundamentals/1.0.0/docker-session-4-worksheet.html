@@ -1,0 +1,1063 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker course — Session 4 manifest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --paper:      #DDE3E7;
+    --paper-lift: #EAEFF1;
+    --field:      #F4F7F8;
+    --ink:        #12293D;
+    --ink-soft:   #4E6478;
+    --rule:       #B2BFC8;
+    --rule-fine:  #C6D1D8;
+    --blue:       #1E6FA8;
+    --blue-deep:  #0E4772;
+    --oxide:      #9A4620;
+
+    --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --s1: 0.8125rem;
+    --s2: 0.9375rem;
+    --s3: 1.0625rem;
+    --s4: 1.3125rem;
+    --s6: 2.125rem;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { background: var(--paper); }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--s2);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  .masthead { border-bottom: 2px solid var(--ink); background: var(--paper-lift); }
+
+  .masthead-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 18px 24px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 20px;
+  }
+
+  .masthead h1 {
+    margin: 0;
+    font-size: var(--s3);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .masthead .sub { font-size: var(--s1); color: var(--ink-soft); }
+
+  .masthead .gauge {
+    flex: 1 1 200px;
+    min-width: 160px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: var(--s1);
+  }
+
+  .gauge-track {
+    flex: 1;
+    height: 8px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+  }
+
+  .gauge-fill {
+    height: 100%;
+    width: 0;
+    background: var(--blue);
+    transition: width 220ms ease;
+  }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 80px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 44px;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .shell {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 40px;
+      padding: 22px 18px 60px;
+    }
+  }
+
+  .manifest {
+    border: 2px solid var(--ink);
+    background: var(--paper-lift);
+    margin-bottom: 38px;
+  }
+
+  .manifest-top {
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .manifest-no {
+    border-right: 1px solid var(--rule);
+    padding: 14px 0;
+    text-align: center;
+    font-family: var(--mono);
+  }
+
+  .manifest-no b {
+    display: block;
+    font-size: var(--s6);
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .manifest-no span { font-size: 0.6875rem; color: var(--ink-soft); }
+
+  .manifest-title { padding: 14px 18px; }
+
+  .manifest-title h2 {
+    margin: 0 0 3px;
+    font-size: var(--s4);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .manifest-title p { margin: 0; font-size: var(--s1); color: var(--ink-soft); }
+
+  .budget { display: grid; grid-template-columns: repeat(3, 1fr); }
+
+  .budget div { padding: 10px 14px; font-size: var(--s1); }
+
+  .budget div + div { border-left: 1px solid var(--rule-fine); }
+
+  .budget b { display: block; font-weight: 500; }
+
+  .budget span { font-family: var(--mono); color: var(--ink-soft); font-size: 0.75rem; }
+
+  .block { margin-bottom: 42px; }
+
+  .block-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .block-head h3 { margin: 0; font-size: var(--s3); font-weight: 600; }
+
+  .block-head .count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .block-note {
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    margin: 8px 0 20px;
+    max-width: 62ch;
+  }
+
+  .item { border-bottom: 1px solid var(--rule-fine); padding: 15px 0 17px; }
+
+  .item-row { display: flex; gap: 12px; align-items: flex-start; }
+
+  .tick {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    margin: 3px 0 0;
+    background: var(--field);
+    border: 1.5px solid var(--ink-soft);
+    cursor: pointer;
+    position: relative;
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+
+  .tick:checked { background: var(--blue); border-color: var(--blue-deep); }
+
+  .tick:checked::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    background: var(--paper-lift);
+  }
+
+  .item-body { flex: 1 1 auto; min-width: 0; }
+
+  .item-label { font-size: var(--s2); cursor: pointer; display: block; }
+
+  .tick:checked ~ .item-body .item-label { color: var(--ink-soft); }
+
+  .item-hint {
+    margin: 5px 0 0;
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+
+  .optional {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    padding: 0 5px;
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+
+  .cmd {
+    margin-top: 9px;
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--rule);
+    background: var(--field);
+  }
+
+  .cmd code {
+    flex: 1 1 auto;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    padding: 8px 11px;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--blue-deep);
+  }
+
+  .cmd.file { border-left: 3px solid var(--ink-soft); }
+
+  .cmd.file code { color: var(--ink); }
+
+  .copy {
+    flex: 0 0 auto;
+    border: 0;
+    border-left: 1px solid var(--rule);
+    background: transparent;
+    font-family: var(--sans);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 0 10px;
+    cursor: pointer;
+  }
+
+  .copy:hover { background: var(--paper); color: var(--ink); }
+
+  .filename {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    margin: 12px 0 0;
+  }
+
+  .note {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 9px 11px;
+    font-family: var(--sans);
+    font-size: var(--s2);
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--field);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--blue);
+    resize: vertical;
+  }
+
+  .note::placeholder { color: #8496A3; }
+
+  .note.tall { min-height: 150px; }
+
+  .measure {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    border: 1px solid var(--rule);
+    background: var(--field);
+  }
+
+  .measure th,
+  .measure td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--rule-fine);
+    font-size: var(--s1);
+    vertical-align: top;
+  }
+
+  .measure th { font-weight: 500; color: var(--ink-soft); }
+
+  .measure tr:last-child td { border-bottom: 0; }
+
+  .measure code { font-family: var(--mono); color: var(--blue-deep); }
+
+  .measure input {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    background: transparent;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    color: var(--ink);
+    padding: 2px 0;
+  }
+
+  .pitfall {
+    border-left: 3px solid var(--oxide);
+    background: var(--paper-lift);
+    padding: 12px 15px;
+    margin-top: 24px;
+    font-size: var(--s1);
+    max-width: 66ch;
+  }
+
+  .pitfall b { font-weight: 600; }
+
+  .pitfall p { margin: 0 0 7px; }
+
+  .pitfall p:last-child { margin-bottom: 0; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 30px;
+    padding-top: 22px;
+    border-top: 1px solid var(--ink);
+  }
+
+  .btn {
+    font-family: var(--sans);
+    font-size: var(--s2);
+    font-weight: 500;
+    padding: 9px 15px;
+    border: 1.5px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper-lift);
+    cursor: pointer;
+  }
+
+  .btn.ghost { background: transparent; color: var(--ink); }
+
+  .btn.ghost:hover { background: var(--paper-lift); }
+
+  .btn.quiet {
+    border-color: var(--rule);
+    background: transparent;
+    color: var(--ink-soft);
+    font-weight: 400;
+  }
+
+  .btn.quiet:hover { color: var(--oxide); border-color: var(--oxide); }
+
+  .status {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+
+  .status.show { opacity: 1; }
+
+  .tracker { position: sticky; top: 22px; }
+
+  @media (max-width: 900px) { .tracker { position: static; } }
+
+  .tracker h3 { margin: 0 0 3px; font-size: var(--s3); font-weight: 600; }
+
+  .tracker .lede { margin: 0 0 16px; font-size: var(--s1); color: var(--ink-soft); }
+
+  .crown {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 6px 9px;
+    border: 1px dashed var(--rule);
+    margin-bottom: 4px;
+  }
+
+  .crown.earned {
+    color: var(--paper-lift);
+    background: var(--blue-deep);
+    border: 1px solid var(--blue-deep);
+  }
+
+  .stack { display: flex; flex-direction: column-reverse; }
+
+  .layer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 10px;
+    margin-top: 2px;
+    background: var(--paper-lift);
+    border: 1px solid var(--rule-fine);
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .layer-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0;
+    background: rgba(30, 111, 168, 0.16);
+    border-right: 1px solid rgba(14, 71, 114, 0.35);
+    transition: width 260ms ease;
+    pointer-events: none;
+  }
+
+  .layer.done { border-color: var(--blue-deep); }
+
+  .layer-no {
+    position: relative;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    flex: 0 0 auto;
+  }
+
+  .layer.done .layer-no { color: var(--blue-deep); }
+
+  .layer-name {
+    position: relative;
+    font-size: var(--s1);
+    line-height: 1.35;
+    flex: 1 1 auto;
+  }
+
+  .layer-mark {
+    position: relative;
+    flex: 0 0 auto;
+    width: 13px;
+    height: 13px;
+    border: 1.5px solid var(--ink-soft);
+    background: var(--field);
+  }
+
+  .layer.done .layer-mark { background: var(--blue); border-color: var(--blue-deep); }
+
+  .layer.current { border-left: 3px solid var(--blue); padding-left: 8px; }
+
+  .foot {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    background: var(--paper);
+    border: 1px solid var(--rule-fine);
+    border-top: 0;
+    margin-top: 2px;
+  }
+
+  .tracker-meta { margin-top: 14px; font-size: var(--s1); color: var(--ink-soft); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <h1>Docker, ten sessions</h1>
+    <span class="sub">Session worksheet and course tracker</span>
+    <div class="gauge">
+      <span id="gauge-label">0/16</span>
+      <div class="gauge-track"><div class="gauge-fill" id="gauge-fill"></div></div>
+      <span>session 4</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <main>
+
+    <section class="manifest">
+      <div class="manifest-top">
+        <div class="manifest-no">
+          <b>04</b>
+          <span>of ten</span>
+        </div>
+        <div class="manifest-title">
+          <h2>Containerizing React and Next.js</h2>
+          <p>Your own stack, in two containers that want opposite things. The production image you build today is deliberately fat — it's the baseline you cut down next session.</p>
+        </div>
+      </div>
+      <div class="budget">
+        <div><b>Theory</b><span>40 min</span></div>
+        <div><b>Hands-on</b><span>110 min</span></div>
+        <div><b>Deliverable</b><span>40 min</span></div>
+      </div>
+    </section>
+
+    <!-- THEORY -->
+    <section class="block">
+      <div class="block-head">
+        <h3>Theory</h3>
+        <span class="count" data-count="theory">0/4</span>
+      </div>
+      <p class="block-note">Three sessions of generic Docker. This is where it meets what you actually build — and where frontend containers turn out to have their own set of problems.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t1" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t1">Two Dockerfiles, wanting opposite things</label>
+            <p class="item-hint">A dev container optimizes for feedback speed: source mounted from your machine, dev server running, dependencies installed including the dev ones. A production container optimizes for size and immutability: nothing mounted, source already compiled, no dev tooling. There is no single file that does both well.</p>
+            <textarea class="note" data-note="t1" rows="2" placeholder="What would break if you shipped the dev container to production?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t2" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t2">Static output versus a running server</label>
+            <p class="item-hint">A Vite or CRA build produces files. It needs a web server, and once built, Node is not involved at all. Next.js with SSR produces a Node process that has to stay alive to render requests. Which one you have decides the base image, the command, and the port.</p>
+            <textarea class="note" data-note="t2" rows="2" placeholder="Which shape is each of your projects, and why?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t3" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t3">The three ways to deploy a Next.js build</label>
+            <p class="item-hint">Plain <code>next start</code> needs the whole project directory present. <code>output: "standalone"</code> traces only the files the server actually imports and emits a self-contained folder — that's the one that makes small images possible. <code>output: "export"</code> gives you static files and drops server features. You'll use <code>next start</code> today and switch to standalone in session 5.</p>
+            <textarea class="note" data-note="t3" rows="2" placeholder="Which of the three fits your app, given the features it uses?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t4" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t4">Build-time environment variables are permanent</label>
+            <p class="item-hint">Anything prefixed <code>NEXT_PUBLIC_</code> gets inlined into the JavaScript bundle when you build. It is a string in a file, not a variable read at startup — so passing a different value with <code>-e</code> at run time changes nothing. Server-only variables have no such problem. This is the single most confusing thing about containerizing Next.js.</p>
+            <textarea class="note" data-note="t4" rows="2" placeholder="Predict it: what does that mean for one image promoted from staging to production?"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HANDS-ON -->
+    <section class="block">
+      <div class="block-head">
+        <h3>Hands-on</h3>
+        <span class="count" data-count="lab">0/9</span>
+      </div>
+      <p class="block-note">Use a real app of your own. Commands below assume a Next.js project and port 3000 — adjust the port if yours differs. On PowerShell, swap <code>$(pwd)</code> for <code>${PWD}</code>.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h1" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h1">Build the dev container and mount your source into it</label>
+            <p class="item-hint">The dev server runs inside the container; the code comes from your machine. Then edit a component and watch the browser.</p>
+            <p class="filename">Dockerfile.dev</p>
+            <div class="cmd file"><code>FROM node:22-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+EXPOSE 3000
+CMD ["npm", "run", "dev"]</code><button class="copy" type="button">Copy</button></div>
+            <div class="cmd"><code>docker build -f Dockerfile.dev -t myweb:dev .
+docker run --rm -it -p 3000:3000 -v "$(pwd):/app" myweb:dev</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h2" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h2">Fix the shadowed <code>node_modules</code></label>
+            <p class="item-hint">That mount replaced the container's entire <code>/app</code> — including the <code>node_modules</code> the build installed. If it started at all, it's using your host's copy. The empty anonymous volume masks that one path so the container keeps its own. Add <code>.next</code> too, so container build output doesn't land in your working tree.</p>
+            <div class="cmd"><code>docker run --rm -it -p 3000:3000 \
+  -v "$(pwd):/app" \
+  -v /app/node_modules \
+  -v /app/.next \
+  myweb:dev</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h2" rows="2" placeholder="What error did you get before the fix, if any?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h3" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h3">Get file watching firing if hot reload is dead</label>
+            <p class="item-hint">Filesystem events often don't cross the boundary into the container's VM, so the dev server never learns your file changed. Polling fixes it at the cost of some CPU. Which variable applies depends on the bundler your dev server uses — try these, and write down which one worked.</p>
+            <div class="cmd"><code>docker run --rm -it -p 3000:3000 \
+  -v "$(pwd):/app" -v /app/node_modules -v /app/.next \
+  -e WATCHPACK_POLLING=true \
+  -e CHOKIDAR_USEPOLLING=true \
+  myweb:dev</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h3" rows="2" placeholder="Hot reload working? Which setting did it need, and which bundler are you on?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h4" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h4">Write the production Dockerfile — the honest, fat version</label>
+            <p class="item-hint">One stage, dev dependencies installed because the build needs them, source copied in, built inside the image. It works, and it's much bigger than it needs to be. Leave it that way.</p>
+            <p class="filename">Dockerfile</p>
+            <div class="cmd file"><code>FROM node:22-alpine
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+
+ARG NEXT_PUBLIC_API_URL
+ENV NEXT_PUBLIC_API_URL=$NEXT_PUBLIC_API_URL
+
+RUN npm run build
+ENV NODE_ENV=production
+EXPOSE 3000
+CMD ["npm", "start"]</code><button class="copy" type="button">Copy</button></div>
+            <div class="cmd"><code>docker build --build-arg NEXT_PUBLIC_API_URL=https://built-at-build-time.example -t myweb:prod .</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h5" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h5">Run it, then write down the size</label>
+            <p class="item-hint">This number is your baseline. Session 5 is graded against it, so put it somewhere you'll find again.</p>
+            <div class="cmd"><code>docker run -d -p 3000:3000 --name web myweb:prod
+docker images myweb
+curl -s -o /dev/null -w "%{time_total}s\n" localhost:3000</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h6" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h6">Prove that the public variable is frozen</label>
+            <p class="item-hint">Render <code>process.env.NEXT_PUBLIC_API_URL</code> somewhere visible in a client component. Then start the container with a different value and load the page. It still shows the build-time string — the run-time one is ignored, because there's no variable left to read.</p>
+            <div class="cmd"><code>docker rm -f web
+docker run -d -p 3000:3000 --name web \
+  -e NEXT_PUBLIC_API_URL=https://set-at-run-time.example \
+  myweb:prod
+# then open localhost:3000 and read the value</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h6" rows="2" placeholder="Which value showed up, and what does that force you to do about staging vs production?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h7" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h7">Serve a static build behind nginx, and fix the deep-link 404 <span class="optional">Vite / SPA</span></label>
+            <p class="item-hint">Only relevant if you also ship static builds — but the routing bug catches everyone once. Load a nested route directly and nginx returns 404, because there is no file at that path. <code>try_files</code> hands every unmatched request to <code>index.html</code> and lets the router take over. This is also the one place today you'll need two <code>FROM</code> lines; session 5 explains why.</p>
+            <p class="filename">nginx.conf</p>
+            <div class="cmd file"><code>server {
+  listen 80;
+  root /usr/share/nginx/html;
+  index index.html;
+
+  location / {
+    try_files $uri $uri/ /index.html;
+  }
+}</code><button class="copy" type="button">Copy</button></div>
+            <p class="filename">Dockerfile.static</p>
+            <div class="cmd file"><code>FROM node:22-alpine AS build
+WORKDIR /app
+COPY package*.json ./
+RUN npm ci
+COPY . .
+RUN npm run build
+
+FROM nginx:alpine
+COPY --from=build /app/dist /usr/share/nginx/html
+COPY nginx.conf /etc/nginx/conf.d/default.conf</code><button class="copy" type="button">Copy</button></div>
+            <div class="cmd"><code>docker build -f Dockerfile.static -t myweb:static .
+docker run -d -p 8080:80 --name static myweb:static
+curl -I localhost:8080/some/nested/route</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h8" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h8">Fill in the comparison</label>
+            <p class="item-hint">Check the dev dependencies row with <code>docker run --rm myweb:prod ls node_modules</code> and look for something like <code>eslint</code> or <code>typescript</code>.</p>
+            <table class="measure">
+              <thead>
+                <tr><th></th><th>Dev container</th><th>Prod container</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>Image size</td>
+                  <td><input type="text" data-note="c-size-dev" placeholder="MB"></td>
+                  <td><input type="text" data-note="c-size-prod" placeholder="MB"></td>
+                </tr>
+                <tr>
+                  <td>Time to first response</td>
+                  <td><input type="text" data-note="c-boot-dev" placeholder="s"></td>
+                  <td><input type="text" data-note="c-boot-prod" placeholder="s"></td>
+                </tr>
+                <tr>
+                  <td>Source edit appears live</td>
+                  <td><input type="text" data-note="c-hmr-dev" placeholder="yes / no"></td>
+                  <td><input type="text" data-note="c-hmr-prod" placeholder="yes / no"></td>
+                </tr>
+                <tr>
+                  <td>Dev dependencies inside</td>
+                  <td><input type="text" data-note="c-dev-dev" placeholder="yes / no"></td>
+                  <td><input type="text" data-note="c-dev-prod" placeholder="yes / no"></td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h9" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h9">Look inside the production image and list what doesn't belong</label>
+            <p class="item-hint">Your source files, the whole dependency tree including build-only tooling, probably a lockfile and config you don't need at run time. Name them now — that list is precisely what session 5 deletes.</p>
+            <div class="cmd"><code>docker run --rm -it myweb:prod sh
+ls -la
+du -sh node_modules
+ls node_modules | wc -l
+exit</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h9" rows="3" placeholder="Things in this image that a running server has no use for:"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DELIVERABLE -->
+    <section class="block">
+      <div class="block-head">
+        <h3>Deliverable</h3>
+        <span class="count" data-count="ship">0/3</span>
+      </div>
+      <p class="block-note">Two working Dockerfiles for an app that's actually yours. That's the first thing in this course a reviewer could look at and take seriously.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d1" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d1">Commit both Dockerfiles and the run commands that go with them</label>
+            <p class="item-hint">The mount flags are the part you'll forget. Put the full dev command in the README, not in your shell history.</p>
+            <textarea class="note tall" data-note="d1" rows="6" placeholder="## Development&#10;docker run … (full command, with the volume flags)&#10;&#10;## Production&#10;docker build … / docker run …&#10;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d2" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d2">Write your environment variable rule down</label>
+            <p class="item-hint">For each variable your app uses: does it have to be known at build time, or can it be supplied at startup? Getting this list right now saves you a genuinely nasty debugging session in session 8.</p>
+            <textarea class="note" data-note="d2" rows="4" placeholder="Must be set at build time:&#10;Can be set at run time:&#10;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d3" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d3">Update <code>notes.md</code> and commit</label>
+            <textarea class="note" data-note="d3" rows="2" placeholder="One open question to bring into session 5:"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="pitfall">
+        <p><b>The two that will cost you the most time.</b></p>
+        <p>Mounting your project over <code>/app</code> hides everything the image built there. If the container starts and immediately complains it can't find a module, or crashes on a native binary, that's your host <code>node_modules</code> being used inside Alpine Linux. The anonymous volume in step 2 is the fix, and you will need it on every project.</p>
+        <p>Hot reload failing silently is not a Docker error — nothing logs, the page simply never updates. Reach for the polling flags before you start rewriting your dev setup.</p>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn" type="button" id="export">Copy to notes.md</button>
+        <button class="btn ghost" type="button" id="complete">Mark session 4 complete</button>
+        <button class="btn quiet" type="button" id="reset">Clear saved work</button>
+        <span class="status" id="status"></span>
+      </div>
+    </section>
+  </main>
+
+  <aside class="tracker">
+    <h3>Course stack</h3>
+    <p class="lede">Ten layers on top of scratch. Session 4 fills as you tick items.</p>
+
+    <div class="crown" id="crown">docker-course:incomplete</div>
+    <div class="stack" id="stack"></div>
+    <div class="foot">FROM scratch</div>
+
+    <p class="tracker-meta" id="tracker-meta">0 of 10 sessions closed.</p>
+  </aside>
+</div>
+
+<script>
+  const SESSIONS = [
+    "The container mental model",
+    "Images, layers, and the CLI",
+    "Your first Dockerfile",
+    "Containerizing React and Next.js",
+    "Multi-stage builds and optimization",
+    "Volumes and persistence",
+    "Networking and Docker Compose",
+    "Configuration and secrets",
+    "Docker in CI/CD",
+    "Running containers in production"
+  ];
+
+  const THIS_SESSION = 4;
+  const KEY = "docker-course:session-4";
+  const BLOCK_TITLES = { theory: "Theory", lab: "Hands-on", ship: "Deliverable" };
+
+  const COMPARE_ROWS = [
+    ["Image size", "c-size-dev", "c-size-prod"],
+    ["Time to first response", "c-boot-dev", "c-boot-prod"],
+    ["Source edit appears live", "c-hmr-dev", "c-hmr-prod"],
+    ["Dev dependencies inside", "c-dev-dev", "c-dev-prod"]
+  ];
+
+  // sessions 1 to 3 assumed behind you — untick them if that's wrong
+  let state = { ticks: {}, notes: {}, sessions: { 1: true, 2: true, 3: true } };
+  let saveTimer = null;
+
+  const ticks    = Array.from(document.querySelectorAll(".tick"));
+  const fields   = Array.from(document.querySelectorAll("[data-note]"));
+  const statusEl = document.getElementById("status");
+
+  async function load() {
+    try {
+      const res = await window.storage.get(KEY);
+      if (res && res.value) {
+        const saved = JSON.parse(res.value);
+        state = Object.assign({ ticks: {}, notes: {}, sessions: {} }, saved);
+      }
+    } catch (e) {
+      // nothing saved yet, or storage unavailable — carry on with a blank sheet
+    }
+    hydrate();
+  }
+
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      try {
+        await window.storage.set(KEY, JSON.stringify(state));
+        flash("saved");
+      } catch (e) {
+        flash("not saved — working in this tab only");
+      }
+    }, 400);
+  }
+
+  function flash(msg) {
+    statusEl.textContent = msg;
+    statusEl.classList.add("show");
+    setTimeout(() => statusEl.classList.remove("show"), 1600);
+  }
+
+  function hydrate() {
+    ticks.forEach(t => { t.checked = !!state.ticks[t.id]; });
+    fields.forEach(f => { f.value = state.notes[f.dataset.note] || ""; });
+    render();
+  }
+
+  ticks.forEach(t => {
+    t.addEventListener("change", () => {
+      state.ticks[t.id] = t.checked;
+      render();
+      save();
+    });
+  });
+
+  fields.forEach(f => {
+    f.addEventListener("input", () => {
+      state.notes[f.dataset.note] = f.value;
+      save();
+    });
+  });
+
+  document.querySelectorAll(".copy").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const text = btn.parentElement.querySelector("code").textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = "Copied";
+      } catch (e) {
+        btn.textContent = "Select it";
+      }
+      setTimeout(() => { btn.textContent = "Copy"; }, 1400);
+    });
+  });
+
+  const stackEl = document.getElementById("stack");
+
+  SESSIONS.forEach((name, i) => {
+    const n = i + 1;
+    const row = document.createElement("div");
+    row.className = "layer";
+    row.dataset.session = n;
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.innerHTML =
+      '<div class="layer-fill"></div>' +
+      '<span class="layer-no">' + String(n).padStart(2, "0") + '</span>' +
+      '<span class="layer-name">' + name + '</span>' +
+      '<span class="layer-mark"></span>';
+
+    const toggle = () => {
+      state.sessions[n] = !state.sessions[n];
+      render();
+      save();
+    };
+
+    row.addEventListener("click", toggle);
+    row.addEventListener("keydown", ev => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); }
+    });
+
+    stackEl.appendChild(row);
+  });
+
+  function render() {
+    const total = ticks.length;
+    const done = ticks.filter(t => t.checked).length;
+
+    document.getElementById("gauge-fill").style.width = (done / total * 100) + "%";
+    document.getElementById("gauge-label").textContent = done + "/" + total;
+
+    document.querySelectorAll("[data-count]").forEach(el => {
+      const block = el.dataset.count;
+      const group = ticks.filter(t => t.dataset.block === block);
+      el.textContent = group.filter(t => t.checked).length + "/" + group.length;
+    });
+
+    const closed = Object.values(state.sessions).filter(Boolean).length;
+
+    document.querySelectorAll(".layer").forEach(row => {
+      const n = Number(row.dataset.session);
+      const isDone = !!state.sessions[n];
+      row.classList.toggle("done", isDone);
+      row.classList.toggle("current", n === THIS_SESSION && !isDone);
+      const pct = isDone ? 100 : (n === THIS_SESSION ? done / total * 100 : 0);
+      row.querySelector(".layer-fill").style.width = pct + "%";
+      row.setAttribute("aria-pressed", String(isDone));
+    });
+
+    const crown = document.getElementById("crown");
+    crown.textContent = closed === 10 ? "docker-course:v1  built" : "docker-course:incomplete";
+    crown.classList.toggle("earned", closed === 10);
+
+    document.getElementById("tracker-meta").textContent = closed + " of 10 sessions closed.";
+  }
+
+  document.getElementById("complete").addEventListener("click", () => {
+    state.sessions[THIS_SESSION] = true;
+    render();
+    save();
+    flash("session 4 closed");
+  });
+
+  document.getElementById("reset").addEventListener("click", async () => {
+    if (!confirm("Clear every tick and note on this sheet?")) return;
+    state = { ticks: {}, notes: {}, sessions: { 1: true, 2: true, 3: true } };
+    try { await window.storage.delete(KEY); } catch (e) {}
+    hydrate();
+    flash("cleared");
+  });
+
+  document.getElementById("export").addEventListener("click", async () => {
+    const total = ticks.length;
+    const done = ticks.filter(t => t.checked).length;
+
+    let md = "# Session 4 — Containerizing React and Next.js\n\n";
+    md += "Progress: " + done + "/" + total + " items\n";
+
+    let current = null;
+    ticks.forEach(t => {
+      if (t.dataset.block !== current) {
+        current = t.dataset.block;
+        md += "\n## " + BLOCK_TITLES[current] + "\n\n";
+      }
+      const label = t.parentElement.querySelector(".item-label").textContent.trim();
+      md += "- [" + (t.checked ? "x" : " ") + "] " + label + "\n";
+
+      if (t.id === "h8") {
+        md += "\n  | | Dev container | Prod container |\n  |---|---|---|\n";
+        COMPARE_ROWS.forEach(r => {
+          md += "  | " + r[0] + " | " + (state.notes[r[1]] || "—") +
+                " | " + (state.notes[r[2]] || "—") + " |\n";
+        });
+        md += "\n";
+        return;
+      }
+
+      const note = (state.notes[t.id] || "").trim();
+      if (note) {
+        note.split("\n").forEach(line => { md += "  > " + line + "\n"; });
+      }
+    });
+
+    md += "\n";
+
+    try {
+      await navigator.clipboard.writeText(md);
+      flash("markdown copied");
+    } catch (e) {
+      flash("clipboard blocked — copy manually");
+      console.log(md);
+    }
+  });
+
+  load();
+</script>

@@ -1,0 +1,1066 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker course — Session 7 manifest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --paper:      #DDE3E7;
+    --paper-lift: #EAEFF1;
+    --field:      #F4F7F8;
+    --ink:        #12293D;
+    --ink-soft:   #4E6478;
+    --rule:       #B2BFC8;
+    --rule-fine:  #C6D1D8;
+    --blue:       #1E6FA8;
+    --blue-deep:  #0E4772;
+    --oxide:      #9A4620;
+
+    --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --s1: 0.8125rem;
+    --s2: 0.9375rem;
+    --s3: 1.0625rem;
+    --s4: 1.3125rem;
+    --s6: 2.125rem;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { background: var(--paper); }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--s2);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  .masthead { border-bottom: 2px solid var(--ink); background: var(--paper-lift); }
+
+  .masthead-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 18px 24px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 20px;
+  }
+
+  .masthead h1 {
+    margin: 0;
+    font-size: var(--s3);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .masthead .sub { font-size: var(--s1); color: var(--ink-soft); }
+
+  .masthead .gauge {
+    flex: 1 1 200px;
+    min-width: 160px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: var(--s1);
+  }
+
+  .gauge-track {
+    flex: 1;
+    height: 8px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+  }
+
+  .gauge-fill {
+    height: 100%;
+    width: 0;
+    background: var(--blue);
+    transition: width 220ms ease;
+  }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 80px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 44px;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .shell {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 40px;
+      padding: 22px 18px 60px;
+    }
+  }
+
+  .manifest {
+    border: 2px solid var(--ink);
+    background: var(--paper-lift);
+    margin-bottom: 38px;
+  }
+
+  .manifest-top {
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .manifest-no {
+    border-right: 1px solid var(--rule);
+    padding: 14px 0;
+    text-align: center;
+    font-family: var(--mono);
+  }
+
+  .manifest-no b {
+    display: block;
+    font-size: var(--s6);
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .manifest-no span { font-size: 0.6875rem; color: var(--ink-soft); }
+
+  .manifest-title { padding: 14px 18px; }
+
+  .manifest-title h2 {
+    margin: 0 0 3px;
+    font-size: var(--s4);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .manifest-title p { margin: 0; font-size: var(--s1); color: var(--ink-soft); }
+
+  .budget { display: grid; grid-template-columns: repeat(3, 1fr); }
+
+  .budget div { padding: 10px 14px; font-size: var(--s1); }
+
+  .budget div + div { border-left: 1px solid var(--rule-fine); }
+
+  .budget b { display: block; font-weight: 500; }
+
+  .budget span { font-family: var(--mono); color: var(--ink-soft); font-size: 0.75rem; }
+
+  .block { margin-bottom: 42px; }
+
+  .block-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .block-head h3 { margin: 0; font-size: var(--s3); font-weight: 600; }
+
+  .block-head .count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .block-note {
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    margin: 8px 0 20px;
+    max-width: 62ch;
+  }
+
+  .item { border-bottom: 1px solid var(--rule-fine); padding: 15px 0 17px; }
+
+  .item-row { display: flex; gap: 12px; align-items: flex-start; }
+
+  .tick {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    margin: 3px 0 0;
+    background: var(--field);
+    border: 1.5px solid var(--ink-soft);
+    cursor: pointer;
+    position: relative;
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+
+  .tick:checked { background: var(--blue); border-color: var(--blue-deep); }
+
+  .tick:checked::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    background: var(--paper-lift);
+  }
+
+  .item-body { flex: 1 1 auto; min-width: 0; }
+
+  .item-label { font-size: var(--s2); cursor: pointer; display: block; }
+
+  .tick:checked ~ .item-body .item-label { color: var(--ink-soft); }
+
+  .item-hint {
+    margin: 5px 0 0;
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+
+  .cmd {
+    margin-top: 9px;
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--rule);
+    background: var(--field);
+  }
+
+  .cmd code {
+    flex: 1 1 auto;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    padding: 8px 11px;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--blue-deep);
+  }
+
+  .cmd.file { border-left: 3px solid var(--ink-soft); }
+
+  .cmd.file code { color: var(--ink); }
+
+  .copy {
+    flex: 0 0 auto;
+    border: 0;
+    border-left: 1px solid var(--rule);
+    background: transparent;
+    font-family: var(--sans);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 0 10px;
+    cursor: pointer;
+  }
+
+  .copy:hover { background: var(--paper); color: var(--ink); }
+
+  .filename {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    margin: 12px 0 0;
+  }
+
+  .alt {
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    margin: 8px 0 0;
+    padding-left: 11px;
+    border-left: 2px solid var(--rule);
+    max-width: 62ch;
+  }
+
+  .alt code { font-family: var(--mono); }
+
+  .note {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 9px 11px;
+    font-family: var(--sans);
+    font-size: var(--s2);
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--field);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--blue);
+    resize: vertical;
+  }
+
+  .note::placeholder { color: #8496A3; }
+
+  .note.tall { min-height: 150px; }
+
+  .measure {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    border: 1px solid var(--rule);
+    background: var(--field);
+  }
+
+  .measure th,
+  .measure td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--rule-fine);
+    font-size: var(--s1);
+    vertical-align: top;
+  }
+
+  .measure th { font-weight: 500; color: var(--ink-soft); }
+
+  .measure tr:last-child td { border-bottom: 0; }
+
+  .measure code { font-family: var(--mono); color: var(--blue-deep); }
+
+  .measure input {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    background: transparent;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    color: var(--ink);
+    padding: 2px 0;
+  }
+
+  .measure .verdict { width: 110px; }
+
+  .pitfall {
+    border-left: 3px solid var(--oxide);
+    background: var(--paper-lift);
+    padding: 12px 15px;
+    margin-top: 24px;
+    font-size: var(--s1);
+    max-width: 66ch;
+  }
+
+  .pitfall b { font-weight: 600; }
+
+  .pitfall p { margin: 0 0 7px; }
+
+  .pitfall p:last-child { margin-bottom: 0; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 30px;
+    padding-top: 22px;
+    border-top: 1px solid var(--ink);
+  }
+
+  .btn {
+    font-family: var(--sans);
+    font-size: var(--s2);
+    font-weight: 500;
+    padding: 9px 15px;
+    border: 1.5px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper-lift);
+    cursor: pointer;
+  }
+
+  .btn.ghost { background: transparent; color: var(--ink); }
+
+  .btn.ghost:hover { background: var(--paper-lift); }
+
+  .btn.quiet {
+    border-color: var(--rule);
+    background: transparent;
+    color: var(--ink-soft);
+    font-weight: 400;
+  }
+
+  .btn.quiet:hover { color: var(--oxide); border-color: var(--oxide); }
+
+  .status {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+
+  .status.show { opacity: 1; }
+
+  .tracker { position: sticky; top: 22px; }
+
+  @media (max-width: 900px) { .tracker { position: static; } }
+
+  .tracker h3 { margin: 0 0 3px; font-size: var(--s3); font-weight: 600; }
+
+  .tracker .lede { margin: 0 0 16px; font-size: var(--s1); color: var(--ink-soft); }
+
+  .crown {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 6px 9px;
+    border: 1px dashed var(--rule);
+    margin-bottom: 4px;
+  }
+
+  .crown.earned {
+    color: var(--paper-lift);
+    background: var(--blue-deep);
+    border: 1px solid var(--blue-deep);
+  }
+
+  .stack { display: flex; flex-direction: column-reverse; }
+
+  .layer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 10px;
+    margin-top: 2px;
+    background: var(--paper-lift);
+    border: 1px solid var(--rule-fine);
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .layer-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0;
+    background: rgba(30, 111, 168, 0.16);
+    border-right: 1px solid rgba(14, 71, 114, 0.35);
+    transition: width 260ms ease;
+    pointer-events: none;
+  }
+
+  .layer.done { border-color: var(--blue-deep); }
+
+  .layer-no {
+    position: relative;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    flex: 0 0 auto;
+  }
+
+  .layer.done .layer-no { color: var(--blue-deep); }
+
+  .layer-name {
+    position: relative;
+    font-size: var(--s1);
+    line-height: 1.35;
+    flex: 1 1 auto;
+  }
+
+  .layer-mark {
+    position: relative;
+    flex: 0 0 auto;
+    width: 13px;
+    height: 13px;
+    border: 1.5px solid var(--ink-soft);
+    background: var(--field);
+  }
+
+  .layer.done .layer-mark { background: var(--blue); border-color: var(--blue-deep); }
+
+  .layer.current { border-left: 3px solid var(--blue); padding-left: 8px; }
+
+  .foot {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    background: var(--paper);
+    border: 1px solid var(--rule-fine);
+    border-top: 0;
+    margin-top: 2px;
+  }
+
+  .tracker-meta { margin-top: 14px; font-size: var(--s1); color: var(--ink-soft); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <h1>Docker, ten sessions</h1>
+    <span class="sub">Session worksheet and course tracker</span>
+    <div class="gauge">
+      <span id="gauge-label">0/16</span>
+      <div class="gauge-track"><div class="gauge-fill" id="gauge-fill"></div></div>
+      <span>session 7</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <main>
+
+    <section class="manifest">
+      <div class="manifest-top">
+        <div class="manifest-no">
+          <b>07</b>
+          <span>of ten</span>
+        </div>
+        <div class="manifest-title">
+          <h2>Networking and Docker Compose</h2>
+          <p>Three services, one command. The most immediately useful session in the course — and the one where you finally stop typing eleven flags per container.</p>
+        </div>
+      </div>
+      <div class="budget">
+        <div><b>Theory</b><span>40 min</span></div>
+        <div><b>Hands-on</b><span>115 min</span></div>
+        <div><b>Deliverable</b><span>45 min</span></div>
+      </div>
+    </section>
+
+    <!-- THEORY -->
+    <section class="block">
+      <div class="block-head">
+        <h3>Theory</h3>
+        <span class="count" data-count="theory">0/4</span>
+      </div>
+      <p class="block-note">Almost every confusing Docker bug you'll hit from here is an addressing bug. Get this block properly straight and the rest of your Docker life gets quieter.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t1" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t1">The default bridge doesn't do names</label>
+            <p class="item-hint">Every container you've run so far landed on the default bridge network, where containers get IPs but cannot resolve each other by name. Create your own network and Docker gives it an embedded DNS server, so service names become hostnames. This is the single reason Compose always creates a network for your project.</p>
+            <textarea class="note" data-note="t1" rows="2" placeholder="Why is relying on container IP addresses a bad plan?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t2" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t2"><code>localhost</code> means "this container"</label>
+            <p class="item-hint">Inside a container, <code>localhost</code> is that container's own loopback interface — not your machine, not a sibling container. An API configured with <code>mongodb://localhost:27017</code> is looking for a database running inside itself. It isn't there. The address is <code>db:27017</code>, the service name.</p>
+            <textarea class="note" data-note="t2" rows="2" placeholder="Write the connection string your API should use, and the one it must not:"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t3" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t3">Publishing is for your machine, not for the stack</label>
+            <p class="item-hint">Containers on a shared network reach each other on the container's own port whether or not it's published. <code>-p</code> exists purely to let things outside Docker in. So a database used only by your API needs no <code>ports</code> entry at all — and in production, actively shouldn't have one.</p>
+            <textarea class="note" data-note="t3" rows="2" placeholder="Which of your three services genuinely need a published port?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t4" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t4">What a Compose file is made of</label>
+            <p class="item-hint"><code>services</code> are containers, <code>volumes</code> are the named volumes from last session, <code>networks</code> is usually implicit. <code>depends_on</code> controls order. <code>healthcheck</code> defines what "ready" means — and without one, <code>depends_on</code> only waits for a container to start, which is not the same thing at all.</p>
+            <textarea class="note" data-note="t4" rows="2" placeholder="What's the difference between a container having started and a database being ready?"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HANDS-ON -->
+    <section class="block">
+      <div class="block-head">
+        <h3>Hands-on</h3>
+        <span class="count" data-count="lab">0/9</span>
+      </div>
+      <p class="block-note">Steps 1 and 2 are ten minutes of deliberate pain so that the Compose file in step 4 reads as relief rather than magic.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h1" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h1">Watch name resolution fail on the default bridge</label>
+            <p class="item-hint">Two containers, same network, and the second cannot find the first. The error is <code>bad address</code> — remember what it looks like, because you'll see it again.</p>
+            <div class="cmd"><code>docker run -d --name db1 mongo:7
+docker run --rm alpine ping -c 1 db1
+docker inspect db1 --format '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}'</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h2" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h2">Create your own network and watch it work</label>
+            <p class="item-hint">Identical commands, one extra flag, and the name resolves. Then wire all three services by hand to feel how much bookkeeping this is.</p>
+            <div class="cmd"><code>docker network create appnet
+docker run -d --name db2 --network appnet mongo:7
+docker run --rm --network appnet alpine ping -c 1 db2
+docker network inspect appnet --format '{{range .Containers}}{{.Name}} {{end}}'</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h3" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h3">Fill in the reachability matrix</label>
+            <p class="item-hint">Come back to this after step 5, when the stack is up. Rows 6 and 7 are the ones that catch experienced developers: the browser is outside Docker entirely, so code running in it cannot use service names no matter where the page was served from.</p>
+            <table class="measure">
+              <thead>
+                <tr><th>From</th><th>Address</th><th class="verdict">Reachable?</th></tr>
+              </thead>
+              <tbody>
+                <tr><td>Your browser</td><td><code>localhost:3000</code></td><td><input type="text" data-note="n1" placeholder="yes / no"></td></tr>
+                <tr><td>Your browser</td><td><code>localhost:27017</code></td><td><input type="text" data-note="n2" placeholder="yes / no"></td></tr>
+                <tr><td>Inside <code>api</code></td><td><code>localhost:27017</code></td><td><input type="text" data-note="n3" placeholder="yes / no"></td></tr>
+                <tr><td>Inside <code>api</code></td><td><code>db:27017</code></td><td><input type="text" data-note="n4" placeholder="yes / no"></td></tr>
+                <tr><td>Inside <code>web</code>, server-side</td><td><code>api:3000</code></td><td><input type="text" data-note="n5" placeholder="yes / no"></td></tr>
+                <tr><td>Browser JS on the page</td><td><code>api:3000</code></td><td><input type="text" data-note="n6" placeholder="yes / no"></td></tr>
+                <tr><td>Browser JS on the page</td><td><code>localhost:4000</code></td><td><input type="text" data-note="n7" placeholder="yes / no"></td></tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h4" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h4">Write the Compose file</label>
+            <p class="item-hint">Everything from sessions 3 through 6 in one place. Note the two different addresses for the same API: the server-side variable uses the service name, the public one uses <code>localhost</code> because the browser resolves it. Add a <code>/health</code> route to your API first — <code>app.get("/health", (_req, res) =&gt; res.send("ok"))</code>.</p>
+            <p class="filename">compose.yaml</p>
+            <div class="cmd file"><code>services:
+  web:
+    build:
+      context: .
+      args:
+        NEXT_PUBLIC_API_URL: http://localhost:4000
+    ports:
+      - "3000:3000"
+    environment:
+      API_URL: http://api:3000
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    build: ./api
+    ports:
+      - "4000:3000"
+    environment:
+      MONGO_URL: mongodb://db:27017/appdb
+    depends_on:
+      db:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3000/health"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
+
+  db:
+    image: mongo:7
+    volumes:
+      - app-data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping')"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  app-data:</code><button class="copy" type="button">Copy</button></div>
+            <p class="alt">If your app talks to the database directly and has no separate API, drop the <code>api</code> service and point <code>web</code> at <code>mongodb://db:27017</code>. The lesson is the same.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h5" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h5">Bring the whole stack up with one command</label>
+            <p class="item-hint">Note what Compose named things: the network and volume are prefixed with your project name, which defaults to the directory. That prefix is why two projects can both have a service called <code>db</code> without colliding.</p>
+            <div class="cmd"><code>docker compose up -d --build
+docker compose ps
+docker network ls | grep -i "$(basename $PWD)"
+docker volume ls | grep -i "$(basename $PWD)"</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h6" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h6">Test each row of the matrix from the right place</label>
+            <p class="item-hint">Use <code>compose exec</code> to run commands from inside a service — that's how you check reachability from the container's point of view rather than yours.</p>
+            <div class="cmd"><code>docker compose exec api wget -qO- http://db:27017
+docker compose exec api wget -qO- http://localhost:27017
+docker compose exec web wget -qO- http://api:3000/health
+curl -s -o /dev/null -w "%{http_code}\n" localhost:3000
+curl -s -o /dev/null -w "%{http_code}\n" localhost:27017</code><button class="copy" type="button">Copy</button></div>
+            <p class="alt">For rows 6 and 7, open the page in your browser and try both URLs from the devtools console.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h7" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h7">Prove the database needs no published port</label>
+            <p class="item-hint">There's no <code>ports</code> entry on <code>db</code> in that file, and the API still reaches it fine while your host can't touch it at all. That's the correct shape: exactly one service exposed, everything else reachable only from inside the network.</p>
+            <div class="cmd"><code>docker compose port db 27017
+docker compose exec api wget -qO- --timeout=2 http://db:27017
+docker compose ps --format "table {{.Service}}\t{{.Ports}}"</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h7" rows="2" placeholder="Which services are exposed to your host, and is that the set you want?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h8" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h8">Break the startup order on purpose</label>
+            <p class="item-hint">Replace the API's <code>depends_on</code> with the short form — just <code>- db</code>, no condition — then bring the stack up from cold. Compose starts the database and immediately starts the API, which tries to connect to a server still initialising and crashes. Put the healthcheck condition back and watch it wait instead.</p>
+            <div class="cmd"><code>docker compose down
+# edit compose.yaml: depends_on: [db]
+docker compose up -d --build
+docker compose logs api | tail -20
+docker compose ps</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h8" rows="2" placeholder="What did the API's failure look like, and how long did the healthcheck version take to come up?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h9" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h9">Learn the daily loop, including the dangerous one</label>
+            <p class="item-hint">These six commands are most of what you'll use from now on. The last pair is last session's lesson wearing a different hat: <code>down</code> keeps your named volumes, <code>down -v</code> deletes them. Same trap, new syntax.</p>
+            <div class="cmd"><code>docker compose logs -f api
+docker compose exec db mongosh
+docker compose restart api
+docker compose up -d --build web
+docker compose down
+docker compose down -v</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h9" rows="2" placeholder="After `down` then `up -d`, was your seeded data still there? And after `down -v`?"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DELIVERABLE -->
+    <section class="block">
+      <div class="block-head">
+        <h3>Deliverable</h3>
+        <span class="count" data-count="ship">0/3</span>
+      </div>
+      <p class="block-note">A repo where <code>docker compose up</code> gives someone your entire working environment is a genuinely strong signal. It's also the thing you'll be most grateful for on your own machine in three months.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d1" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d1">Commit <code>compose.yaml</code> with a two-line README section</label>
+            <p class="item-hint">Clone, one command, working stack. Write the README as if for someone who has never seen the project, because that's who it's for — including you, later.</p>
+            <textarea class="note tall" data-note="d1" rows="5" placeholder="## Running locally&#10;docker compose up -d --build&#10;Then open …&#10;Services: &#10;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d2" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d2">Write your addressing rule down in one place</label>
+            <p class="item-hint">Three cases: container to container, host to container, and browser to container. Every future bug in this category is one of those three, and having written the rule once means you'll recognise it in seconds rather than an hour.</p>
+            <textarea class="note" data-note="d2" rows="4" placeholder="Container to container:&#10;My machine to a container:&#10;Browser JS to a container:&#10;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d3" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d3">Clean up the hand-wired containers and commit</label>
+            <p class="item-hint">Remove <code>db1</code>, <code>db2</code> and the <code>appnet</code> network from steps 1 and 2 — Compose manages its own now.</p>
+            <textarea class="note" data-note="d3" rows="2" placeholder="One open question to bring into session 8:"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="pitfall">
+        <p><b>The two that will eat an afternoon.</b></p>
+        <p><code>localhost</code> inside a container refers to that container. This is the most common Docker bug there is, and it's particularly nasty in a frontend project because the same variable can need two different values — <code>api:3000</code> for code running on the server, <code>localhost:4000</code> for code running in the browser. When a fetch works server-side and fails in the browser, this is why.</p>
+        <p><code>depends_on</code> without a condition waits for the container to start, not for the service to be usable. Databases take seconds to accept connections. Your API starts instantly, fails to connect, and exits — and then you spend twenty minutes suspecting the connection string, which is correct.</p>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn" type="button" id="export">Copy to notes.md</button>
+        <button class="btn ghost" type="button" id="complete">Mark session 7 complete</button>
+        <button class="btn quiet" type="button" id="reset">Clear saved work</button>
+        <span class="status" id="status"></span>
+      </div>
+    </section>
+  </main>
+
+  <aside class="tracker">
+    <h3>Course stack</h3>
+    <p class="lede">Ten layers on top of scratch. Session 7 fills as you tick items.</p>
+
+    <div class="crown" id="crown">docker-course:incomplete</div>
+    <div class="stack" id="stack"></div>
+    <div class="foot">FROM scratch</div>
+
+    <p class="tracker-meta" id="tracker-meta">0 of 10 sessions closed.</p>
+  </aside>
+</div>
+
+<script>
+  const SESSIONS = [
+    "The container mental model",
+    "Images, layers, and the CLI",
+    "Your first Dockerfile",
+    "Containerizing React and Next.js",
+    "Multi-stage builds and optimization",
+    "Volumes and persistence",
+    "Networking and Docker Compose",
+    "Configuration and secrets",
+    "Docker in CI/CD",
+    "Running containers in production"
+  ];
+
+  const THIS_SESSION = 7;
+  const KEY = "docker-course:session-7";
+  const BLOCK_TITLES = { theory: "Theory", lab: "Hands-on", ship: "Deliverable" };
+
+  const REACH_ROWS = [
+    ["Your browser", "localhost:3000", "n1"],
+    ["Your browser", "localhost:27017", "n2"],
+    ["Inside api", "localhost:27017", "n3"],
+    ["Inside api", "db:27017", "n4"],
+    ["Inside web, server-side", "api:3000", "n5"],
+    ["Browser JS on the page", "api:3000", "n6"],
+    ["Browser JS on the page", "localhost:4000", "n7"]
+  ];
+
+  // sessions 1 to 6 assumed behind you — untick them if that's wrong
+  let state = {
+    ticks: {},
+    notes: {},
+    sessions: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true }
+  };
+  let saveTimer = null;
+
+  const ticks    = Array.from(document.querySelectorAll(".tick"));
+  const fields   = Array.from(document.querySelectorAll("[data-note]"));
+  const statusEl = document.getElementById("status");
+
+  async function load() {
+    try {
+      const res = await window.storage.get(KEY);
+      if (res && res.value) {
+        const saved = JSON.parse(res.value);
+        state = Object.assign({ ticks: {}, notes: {}, sessions: {} }, saved);
+      }
+    } catch (e) {
+      // nothing saved yet, or storage unavailable — carry on with a blank sheet
+    }
+    hydrate();
+  }
+
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      try {
+        await window.storage.set(KEY, JSON.stringify(state));
+        flash("saved");
+      } catch (e) {
+        flash("not saved — working in this tab only");
+      }
+    }, 400);
+  }
+
+  function flash(msg) {
+    statusEl.textContent = msg;
+    statusEl.classList.add("show");
+    setTimeout(() => statusEl.classList.remove("show"), 1600);
+  }
+
+  function hydrate() {
+    ticks.forEach(t => { t.checked = !!state.ticks[t.id]; });
+    fields.forEach(f => { f.value = state.notes[f.dataset.note] || ""; });
+    render();
+  }
+
+  ticks.forEach(t => {
+    t.addEventListener("change", () => {
+      state.ticks[t.id] = t.checked;
+      render();
+      save();
+    });
+  });
+
+  fields.forEach(f => {
+    f.addEventListener("input", () => {
+      state.notes[f.dataset.note] = f.value;
+      save();
+    });
+  });
+
+  document.querySelectorAll(".copy").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const text = btn.parentElement.querySelector("code").textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = "Copied";
+      } catch (e) {
+        btn.textContent = "Select it";
+      }
+      setTimeout(() => { btn.textContent = "Copy"; }, 1400);
+    });
+  });
+
+  const stackEl = document.getElementById("stack");
+
+  SESSIONS.forEach((name, i) => {
+    const n = i + 1;
+    const row = document.createElement("div");
+    row.className = "layer";
+    row.dataset.session = n;
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.innerHTML =
+      '<div class="layer-fill"></div>' +
+      '<span class="layer-no">' + String(n).padStart(2, "0") + '</span>' +
+      '<span class="layer-name">' + name + '</span>' +
+      '<span class="layer-mark"></span>';
+
+    const toggle = () => {
+      state.sessions[n] = !state.sessions[n];
+      render();
+      save();
+    };
+
+    row.addEventListener("click", toggle);
+    row.addEventListener("keydown", ev => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); }
+    });
+
+    stackEl.appendChild(row);
+  });
+
+  function render() {
+    const total = ticks.length;
+    const done = ticks.filter(t => t.checked).length;
+
+    document.getElementById("gauge-fill").style.width = (done / total * 100) + "%";
+    document.getElementById("gauge-label").textContent = done + "/" + total;
+
+    document.querySelectorAll("[data-count]").forEach(el => {
+      const block = el.dataset.count;
+      const group = ticks.filter(t => t.dataset.block === block);
+      el.textContent = group.filter(t => t.checked).length + "/" + group.length;
+    });
+
+    const closed = Object.values(state.sessions).filter(Boolean).length;
+
+    document.querySelectorAll(".layer").forEach(row => {
+      const n = Number(row.dataset.session);
+      const isDone = !!state.sessions[n];
+      row.classList.toggle("done", isDone);
+      row.classList.toggle("current", n === THIS_SESSION && !isDone);
+      const pct = isDone ? 100 : (n === THIS_SESSION ? done / total * 100 : 0);
+      row.querySelector(".layer-fill").style.width = pct + "%";
+      row.setAttribute("aria-pressed", String(isDone));
+    });
+
+    const crown = document.getElementById("crown");
+    crown.textContent = closed === 10 ? "docker-course:v1  built" : "docker-course:incomplete";
+    crown.classList.toggle("earned", closed === 10);
+
+    document.getElementById("tracker-meta").textContent = closed + " of 10 sessions closed.";
+  }
+
+  document.getElementById("complete").addEventListener("click", () => {
+    state.sessions[THIS_SESSION] = true;
+    render();
+    save();
+    flash("session 7 closed");
+  });
+
+  document.getElementById("reset").addEventListener("click", async () => {
+    if (!confirm("Clear every tick and note on this sheet?")) return;
+    state = {
+      ticks: {},
+      notes: {},
+      sessions: { 1: true, 2: true, 3: true, 4: true, 5: true, 6: true }
+    };
+    try { await window.storage.delete(KEY); } catch (e) {}
+    hydrate();
+    flash("cleared");
+  });
+
+  document.getElementById("export").addEventListener("click", async () => {
+    const total = ticks.length;
+    const done = ticks.filter(t => t.checked).length;
+
+    let md = "# Session 7 — Networking and Docker Compose\n\n";
+    md += "Progress: " + done + "/" + total + " items\n";
+
+    let current = null;
+    ticks.forEach(t => {
+      if (t.dataset.block !== current) {
+        current = t.dataset.block;
+        md += "\n## " + BLOCK_TITLES[current] + "\n\n";
+      }
+      const label = t.parentElement.querySelector(".item-label").textContent.trim();
+      md += "- [" + (t.checked ? "x" : " ") + "] " + label + "\n";
+
+      if (t.id === "h3") {
+        md += "\n  | From | Address | Reachable? |\n  |---|---|---|\n";
+        REACH_ROWS.forEach(r => {
+          md += "  | " + r[0] + " | `" + r[1] + "` | " +
+                (state.notes[r[2]] || "—") + " |\n";
+        });
+        md += "\n";
+        return;
+      }
+
+      const note = (state.notes[t.id] || "").trim();
+      if (note) {
+        note.split("\n").forEach(line => { md += "  > " + line + "\n"; });
+      }
+    });
+
+    md += "\n";
+
+    try {
+      await navigator.clipboard.writeText(md);
+      flash("markdown copied");
+    } catch (e) {
+      flash("clipboard blocked — copy manually");
+      console.log(md);
+    }
+  });
+
+  load();
+</script>

@@ -1,0 +1,1074 @@
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Docker course — Session 6 manifest</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Archivo:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
+
+<style>
+  :root {
+    --paper:      #DDE3E7;
+    --paper-lift: #EAEFF1;
+    --field:      #F4F7F8;
+    --ink:        #12293D;
+    --ink-soft:   #4E6478;
+    --rule:       #B2BFC8;
+    --rule-fine:  #C6D1D8;
+    --blue:       #1E6FA8;
+    --blue-deep:  #0E4772;
+    --oxide:      #9A4620;
+
+    --sans: "Archivo", "Helvetica Neue", Arial, sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+
+    --s1: 0.8125rem;
+    --s2: 0.9375rem;
+    --s3: 1.0625rem;
+    --s4: 1.3125rem;
+    --s6: 2.125rem;
+  }
+
+  * { box-sizing: border-box; }
+
+  html { background: var(--paper); }
+
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--sans);
+    font-size: var(--s2);
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  :focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+
+  .masthead { border-bottom: 2px solid var(--ink); background: var(--paper-lift); }
+
+  .masthead-inner {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 18px 24px 14px;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: 6px 20px;
+  }
+
+  .masthead h1 {
+    margin: 0;
+    font-size: var(--s3);
+    font-weight: 600;
+    letter-spacing: -0.01em;
+  }
+
+  .masthead .sub { font-size: var(--s1); color: var(--ink-soft); }
+
+  .masthead .gauge {
+    flex: 1 1 200px;
+    min-width: 160px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-family: var(--mono);
+    font-size: var(--s1);
+  }
+
+  .gauge-track {
+    flex: 1;
+    height: 8px;
+    background: var(--paper);
+    border: 1px solid var(--rule);
+  }
+
+  .gauge-fill {
+    height: 100%;
+    width: 0;
+    background: var(--blue);
+    transition: width 220ms ease;
+  }
+
+  .shell {
+    max-width: 1180px;
+    margin: 0 auto;
+    padding: 28px 24px 80px;
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) 320px;
+    gap: 44px;
+    align-items: start;
+  }
+
+  @media (max-width: 900px) {
+    .shell {
+      grid-template-columns: minmax(0, 1fr);
+      gap: 40px;
+      padding: 22px 18px 60px;
+    }
+  }
+
+  .manifest {
+    border: 2px solid var(--ink);
+    background: var(--paper-lift);
+    margin-bottom: 38px;
+  }
+
+  .manifest-top {
+    display: grid;
+    grid-template-columns: 78px minmax(0, 1fr);
+    border-bottom: 1px solid var(--rule);
+  }
+
+  .manifest-no {
+    border-right: 1px solid var(--rule);
+    padding: 14px 0;
+    text-align: center;
+    font-family: var(--mono);
+  }
+
+  .manifest-no b {
+    display: block;
+    font-size: var(--s6);
+    font-weight: 500;
+    line-height: 1;
+    letter-spacing: -0.03em;
+  }
+
+  .manifest-no span { font-size: 0.6875rem; color: var(--ink-soft); }
+
+  .manifest-title { padding: 14px 18px; }
+
+  .manifest-title h2 {
+    margin: 0 0 3px;
+    font-size: var(--s4);
+    font-weight: 600;
+    letter-spacing: -0.015em;
+  }
+
+  .manifest-title p { margin: 0; font-size: var(--s1); color: var(--ink-soft); }
+
+  .budget { display: grid; grid-template-columns: repeat(3, 1fr); }
+
+  .budget div { padding: 10px 14px; font-size: var(--s1); }
+
+  .budget div + div { border-left: 1px solid var(--rule-fine); }
+
+  .budget b { display: block; font-weight: 500; }
+
+  .budget span { font-family: var(--mono); color: var(--ink-soft); font-size: 0.75rem; }
+
+  .block { margin-bottom: 42px; }
+
+  .block-head {
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    padding-bottom: 7px;
+    border-bottom: 1px solid var(--ink);
+    margin-bottom: 4px;
+  }
+
+  .block-head h3 { margin: 0; font-size: var(--s3); font-weight: 600; }
+
+  .block-head .count {
+    margin-left: auto;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    white-space: nowrap;
+  }
+
+  .block-note {
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    margin: 8px 0 20px;
+    max-width: 62ch;
+  }
+
+  .item { border-bottom: 1px solid var(--rule-fine); padding: 15px 0 17px; }
+
+  .item-row { display: flex; gap: 12px; align-items: flex-start; }
+
+  .tick {
+    appearance: none;
+    -webkit-appearance: none;
+    flex: 0 0 auto;
+    width: 17px;
+    height: 17px;
+    margin: 3px 0 0;
+    background: var(--field);
+    border: 1.5px solid var(--ink-soft);
+    cursor: pointer;
+    position: relative;
+    transition: background 140ms ease, border-color 140ms ease;
+  }
+
+  .tick:checked { background: var(--blue); border-color: var(--blue-deep); }
+
+  .tick:checked::after {
+    content: "";
+    position: absolute;
+    inset: 3px;
+    background: var(--paper-lift);
+  }
+
+  .item-body { flex: 1 1 auto; min-width: 0; }
+
+  .item-label { font-size: var(--s2); cursor: pointer; display: block; }
+
+  .tick:checked ~ .item-body .item-label { color: var(--ink-soft); }
+
+  .item-hint {
+    margin: 5px 0 0;
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    max-width: 62ch;
+  }
+
+  .optional {
+    display: inline-block;
+    font-family: var(--mono);
+    font-size: 0.6875rem;
+    color: var(--ink-soft);
+    border: 1px solid var(--rule);
+    padding: 0 5px;
+    margin-left: 6px;
+    vertical-align: 1px;
+  }
+
+  .cmd {
+    margin-top: 9px;
+    display: flex;
+    align-items: stretch;
+    border: 1px solid var(--rule);
+    background: var(--field);
+  }
+
+  .cmd code {
+    flex: 1 1 auto;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    padding: 8px 11px;
+    overflow-x: auto;
+    white-space: pre;
+    color: var(--blue-deep);
+  }
+
+  .cmd.file { border-left: 3px solid var(--ink-soft); }
+
+  .cmd.file code { color: var(--ink); }
+
+  .copy {
+    flex: 0 0 auto;
+    border: 0;
+    border-left: 1px solid var(--rule);
+    background: transparent;
+    font-family: var(--sans);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 0 10px;
+    cursor: pointer;
+  }
+
+  .copy:hover { background: var(--paper); color: var(--ink); }
+
+  .filename {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    margin: 12px 0 0;
+  }
+
+  .alt {
+    font-size: var(--s1);
+    color: var(--ink-soft);
+    margin: 8px 0 0;
+    padding-left: 11px;
+    border-left: 2px solid var(--rule);
+    max-width: 62ch;
+  }
+
+  .alt code { font-family: var(--mono); }
+
+  .note {
+    display: block;
+    width: 100%;
+    margin-top: 10px;
+    padding: 9px 11px;
+    font-family: var(--sans);
+    font-size: var(--s2);
+    line-height: 1.5;
+    color: var(--ink);
+    background: var(--field);
+    border: 1px solid var(--rule);
+    border-left: 3px solid var(--blue);
+    resize: vertical;
+  }
+
+  .note::placeholder { color: #8496A3; }
+
+  .note.tall { min-height: 150px; }
+
+  .measure {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 12px;
+    border: 1px solid var(--rule);
+    background: var(--field);
+  }
+
+  .measure th,
+  .measure td {
+    text-align: left;
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--rule-fine);
+    font-size: var(--s1);
+    vertical-align: top;
+  }
+
+  .measure th { font-weight: 500; color: var(--ink-soft); }
+
+  .measure tr:last-child td { border-bottom: 0; }
+
+  .measure code { font-family: var(--mono); color: var(--blue-deep); }
+
+  .measure .na { color: var(--ink-soft); font-family: var(--mono); }
+
+  .measure input {
+    width: 100%;
+    border: 0;
+    border-bottom: 1px solid var(--rule);
+    background: transparent;
+    font-family: var(--mono);
+    font-size: var(--s1);
+    color: var(--ink);
+    padding: 2px 0;
+  }
+
+  .pitfall {
+    border-left: 3px solid var(--oxide);
+    background: var(--paper-lift);
+    padding: 12px 15px;
+    margin-top: 24px;
+    font-size: var(--s1);
+    max-width: 66ch;
+  }
+
+  .pitfall b { font-weight: 600; }
+
+  .pitfall p { margin: 0 0 7px; }
+
+  .pitfall p:last-child { margin-bottom: 0; }
+
+  .toolbar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    align-items: center;
+    margin-top: 30px;
+    padding-top: 22px;
+    border-top: 1px solid var(--ink);
+  }
+
+  .btn {
+    font-family: var(--sans);
+    font-size: var(--s2);
+    font-weight: 500;
+    padding: 9px 15px;
+    border: 1.5px solid var(--ink);
+    background: var(--ink);
+    color: var(--paper-lift);
+    cursor: pointer;
+  }
+
+  .btn.ghost { background: transparent; color: var(--ink); }
+
+  .btn.ghost:hover { background: var(--paper-lift); }
+
+  .btn.quiet {
+    border-color: var(--rule);
+    background: transparent;
+    color: var(--ink-soft);
+    font-weight: 400;
+  }
+
+  .btn.quiet:hover { color: var(--oxide); border-color: var(--oxide); }
+
+  .status {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    opacity: 0;
+    transition: opacity 300ms ease;
+  }
+
+  .status.show { opacity: 1; }
+
+  .tracker { position: sticky; top: 22px; }
+
+  @media (max-width: 900px) { .tracker { position: static; } }
+
+  .tracker h3 { margin: 0 0 3px; font-size: var(--s3); font-weight: 600; }
+
+  .tracker .lede { margin: 0 0 16px; font-size: var(--s1); color: var(--ink-soft); }
+
+  .crown {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 6px 9px;
+    border: 1px dashed var(--rule);
+    margin-bottom: 4px;
+  }
+
+  .crown.earned {
+    color: var(--paper-lift);
+    background: var(--blue-deep);
+    border: 1px solid var(--blue-deep);
+  }
+
+  .stack { display: flex; flex-direction: column-reverse; }
+
+  .layer {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 9px 10px;
+    margin-top: 2px;
+    background: var(--paper-lift);
+    border: 1px solid var(--rule-fine);
+    cursor: pointer;
+    overflow: hidden;
+  }
+
+  .layer-fill {
+    position: absolute;
+    inset: 0 auto 0 0;
+    width: 0;
+    background: rgba(30, 111, 168, 0.16);
+    border-right: 1px solid rgba(14, 71, 114, 0.35);
+    transition: width 260ms ease;
+    pointer-events: none;
+  }
+
+  .layer.done { border-color: var(--blue-deep); }
+
+  .layer-no {
+    position: relative;
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    flex: 0 0 auto;
+  }
+
+  .layer.done .layer-no { color: var(--blue-deep); }
+
+  .layer-name {
+    position: relative;
+    font-size: var(--s1);
+    line-height: 1.35;
+    flex: 1 1 auto;
+  }
+
+  .layer-mark {
+    position: relative;
+    flex: 0 0 auto;
+    width: 13px;
+    height: 13px;
+    border: 1.5px solid var(--ink-soft);
+    background: var(--field);
+  }
+
+  .layer.done .layer-mark { background: var(--blue); border-color: var(--blue-deep); }
+
+  .layer.current { border-left: 3px solid var(--blue); padding-left: 8px; }
+
+  .foot {
+    font-family: var(--mono);
+    font-size: 0.75rem;
+    color: var(--ink-soft);
+    padding: 6px 10px;
+    background: var(--paper);
+    border: 1px solid var(--rule-fine);
+    border-top: 0;
+    margin-top: 2px;
+  }
+
+  .tracker-meta { margin-top: 14px; font-size: var(--s1); color: var(--ink-soft); }
+
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <h1>Docker, ten sessions</h1>
+    <span class="sub">Session worksheet and course tracker</span>
+    <div class="gauge">
+      <span id="gauge-label">0/16</span>
+      <div class="gauge-track"><div class="gauge-fill" id="gauge-fill"></div></div>
+      <span>session 6</span>
+    </div>
+  </div>
+</header>
+
+<div class="shell">
+  <main>
+
+    <section class="manifest">
+      <div class="manifest-top">
+        <div class="manifest-no">
+          <b>06</b>
+          <span>of ten</span>
+        </div>
+        <div class="manifest-title">
+          <h2>Volumes and persistence</h2>
+          <p>The answer to the nginx edit that vanished in session 1. You'll write data, then try to destroy it six different ways and record which ones worked.</p>
+        </div>
+      </div>
+      <div class="budget">
+        <div><b>Theory</b><span>40 min</span></div>
+        <div><b>Hands-on</b><span>95 min</span></div>
+        <div><b>Deliverable</b><span>45 min</span></div>
+      </div>
+    </section>
+
+    <!-- THEORY -->
+    <section class="block">
+      <div class="block-head">
+        <h3>Theory</h3>
+        <span class="count" data-count="theory">0/4</span>
+      </div>
+      <p class="block-note">Everything so far has been stateless. The moment a database enters the picture, the ephemerality you've been relying on becomes the problem instead of the feature.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t1" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t1">What dies with the container, and what doesn't</label>
+            <p class="item-hint">The writable layer dies. Anything a volume is mounted over doesn't, because it was never in the container's filesystem to begin with — reads and writes at that path go somewhere else entirely. A volume is a hole punched through the container.</p>
+            <textarea class="note" data-note="t1" rows="2" placeholder="In your own words: why does mounting a volume at /data/db protect the database files?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t2" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t2">Three kinds of mount, three jobs</label>
+            <p class="item-hint">A <b>named volume</b> is storage Docker creates and manages; you refer to it by name and don't care where it lives. A <b>bind mount</b> points at a specific path on your machine — that's what you used for source code in session 4. <b>tmpfs</b> lives in memory and never touches disk, which is right for secrets and scratch files.</p>
+            <textarea class="note" data-note="t2" rows="2" placeholder="Which one for database files, which for source code, and why not the other way round?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t3" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t3">Where volume data actually is</label>
+            <p class="item-hint">On Linux it's a directory under Docker's data root. On macOS and Windows it's inside the Linux VM that Docker Desktop runs, so you can't just open it in Finder — which is also why bind mounts are slower there and why file-watching needed polling last session. The practical rule: reach volume contents through a container, not through your file browser.</p>
+            <textarea class="note" data-note="t3" rows="2" placeholder="How would you read a file out of a named volume if you can't browse to it?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="t4" data-block="theory">
+          <div class="item-body">
+            <label class="item-label" for="t4">Databases in containers: yes for dev, a real decision for production</label>
+            <p class="item-hint">For local development a containerized database is unambiguously good — disposable, version-pinned, identical for everyone on the team. In production it's a genuine tradeoff: you inherit responsibility for backups, upgrades, and the consequences of a mistyped prune. Managed databases exist because that responsibility is heavier than it looks.</p>
+            <textarea class="note" data-note="t4" rows="2" placeholder="For your own projects: container or managed, and what's driving that?"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- HANDS-ON -->
+    <section class="block">
+      <div class="block-head">
+        <h3>Hands-on</h3>
+        <span class="count" data-count="lab">0/9</span>
+      </div>
+      <p class="block-note">MongoDB below; Postgres equivalents are noted where they differ. Fill the matrix in step 4 as you work through steps 1 to 3.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h1" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h1">Write data with no volume, then destroy it</label>
+            <p class="item-hint">Same shape as the nginx experiment in session 1, but now it's a database and it matters.</p>
+            <div class="cmd"><code>docker run -d --name db-none -p 27017:27017 mongo:7
+docker exec db-none mongosh --quiet --eval 'db.notes.insertOne({ msg: "no volume" })'
+docker exec db-none mongosh --quiet --eval 'db.notes.find()'
+docker rm -f db-none
+docker run -d --name db-none -p 27017:27017 mongo:7
+docker exec db-none mongosh --quiet --eval 'db.notes.find()'</code><button class="copy" type="button">Copy</button></div>
+            <p class="alt">Postgres: add <code>-e POSTGRES_PASSWORD=dev</code> and use <code>psql -U postgres -c</code> in place of <code>mongosh --eval</code>.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h2" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h2">Do it again with a named volume</label>
+            <p class="item-hint">The volume is created for you if it doesn't exist, but creating it explicitly makes the dependency visible.</p>
+            <div class="cmd"><code>docker volume create app-data
+docker run -d --name db -p 27018:27017 -v app-data:/data/db mongo:7
+docker exec db mongosh --quiet --eval 'db.notes.insertOne({ msg: "named volume" })'
+docker exec db mongosh --quiet --eval 'db.notes.find()'</code><button class="copy" type="button">Copy</button></div>
+            <p class="alt">Postgres mounts its data at <code>/var/lib/postgresql/data</code> instead of <code>/data/db</code>.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h3" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h3">Try to destroy the data four ways</label>
+            <p class="item-hint">Run each of these against the volume-backed container, reading the data back after every one. The third is the interesting one: <code>-v</code> removes anonymous volumes, not named ones, so the data survives a command most people believe deletes it.</p>
+            <div class="cmd"><code>docker restart db && sleep 3
+docker exec db mongosh --quiet --eval 'db.notes.find()'
+
+docker rm -f db
+docker run -d --name db -p 27018:27017 -v app-data:/data/db mongo:7 && sleep 3
+docker exec db mongosh --quiet --eval 'db.notes.find()'
+
+docker rm -fv db
+docker run -d --name db -p 27018:27017 -v app-data:/data/db mongo:7 && sleep 3
+docker exec db mongosh --quiet --eval 'db.notes.find()'</code><button class="copy" type="button">Copy</button></div>
+            <p class="alt">Save <code>docker volume rm app-data</code> for after the backup step — it's the one that actually works.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h4" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h4">Fill in the survival matrix</label>
+            <p class="item-hint">This table is your deliverable. It's also the thing to re-read before you ever type a prune command against something you care about.</p>
+            <table class="measure">
+              <thead>
+                <tr><th>Operation</th><th>Named volume</th><th>No volume</th></tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td><code>docker restart</code></td>
+                  <td><input type="text" data-note="p-restart-vol" placeholder="survived?"></td>
+                  <td><input type="text" data-note="p-restart-none" placeholder="survived?"></td>
+                </tr>
+                <tr>
+                  <td><code>docker rm</code>, then recreate</td>
+                  <td><input type="text" data-note="p-rm-vol" placeholder="survived?"></td>
+                  <td><input type="text" data-note="p-rm-none" placeholder="survived?"></td>
+                </tr>
+                <tr>
+                  <td><code>docker rm -v</code>, then recreate</td>
+                  <td><input type="text" data-note="p-rmv-vol" placeholder="survived?"></td>
+                  <td><input type="text" data-note="p-rmv-none" placeholder="survived?"></td>
+                </tr>
+                <tr>
+                  <td><code>docker volume rm</code></td>
+                  <td><input type="text" data-note="p-vrm-vol" placeholder="survived?"></td>
+                  <td class="na">n/a</td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h5" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h5">Ask Docker what it knows about the volume</label>
+            <p class="item-hint">The <code>Mounts</code> field on the container is the one worth remembering — it tells you exactly what's persisted and what isn't, which is the first thing to check when data mysteriously disappears.</p>
+            <div class="cmd"><code>docker volume ls
+docker volume inspect app-data
+docker inspect db --format '{{json .Mounts}}'</code><button class="copy" type="button">Copy</button></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h6" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h6">Back the volume up with a throwaway container, then restore it</label>
+            <p class="item-hint">A container that exists only to hold two mounts and run <code>tar</code>. Stop the database first — copying a running database's files gives you a corrupt archive, and that's the kind of backup that looks fine until you need it.</p>
+            <div class="cmd"><code>docker stop db
+docker run --rm -v app-data:/data -v "$(pwd)":/backup alpine \
+  tar czf /backup/app-data.tgz -C /data .
+
+docker volume create app-restored
+docker run --rm -v app-restored:/data -v "$(pwd)":/backup alpine \
+  tar xzf /backup/app-data.tgz -C /data
+
+docker run -d --name db-restored -p 27019:27017 -v app-restored:/data/db mongo:7
+sleep 3 && docker exec db-restored mongosh --quiet --eval 'db.notes.find()'</code><button class="copy" type="button">Copy</button></div>
+            <p class="alt">This is a file-level copy. The real answer for a database is its own dump tool — <code>mongodump</code> or <code>pg_dump</code> — which can run against a live server and produces something you can restore across versions.</p>
+            <textarea class="note" data-note="h6" rows="2" placeholder="Did the restored container come up with your data? Anything in its logs?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h7" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h7">Seed a fresh database on first run</label>
+            <p class="item-hint">Scripts in that directory run only when the data directory is empty. Start it, confirm the seed data, then restart and confirm the script did <i>not</i> run again — that conditional is the whole behaviour, and forgetting it leads to "why won't my schema change apply".</p>
+            <p class="filename">initdb/01-seed.js</p>
+            <div class="cmd file"><code>db = db.getSiblingDB("appdb");
+db.items.insertMany([
+  { title: "seeded on first run", done: false },
+  { title: "second row", done: true },
+]);</code><button class="copy" type="button">Copy</button></div>
+            <div class="cmd"><code>docker run -d --name db-seed -p 27020:27017 \
+  -v app-seed:/data/db \
+  -v "$(pwd)/initdb:/docker-entrypoint-initdb.d:ro" \
+  mongo:7
+sleep 4
+docker exec db-seed mongosh appdb --quiet --eval 'db.items.find()'
+docker restart db-seed && sleep 4
+docker logs db-seed | tail -20</code><button class="copy" type="button">Copy</button></div>
+            <p class="alt">Postgres reads <code>.sql</code> and <code>.sh</code> files from the same path, with the same empty-directory condition.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h8" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h8">Try a bind mount for the data directory and see what goes wrong</label>
+            <p class="item-hint">Point the database at a folder on your machine instead of a named volume. Depending on your OS this either works but slowly, or fails outright on file ownership or locking. Read the logs either way — the conclusion is the rule: bind mounts for source you edit, named volumes for data the database owns.</p>
+            <div class="cmd"><code>mkdir -p ./db-bind
+docker run -d --name db-bind -p 27021:27017 \
+  -v "$(pwd)/db-bind:/data/db" mongo:7
+sleep 4
+docker ps -a --filter name=db-bind
+docker logs db-bind | tail -20</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h8" rows="2" placeholder="What happened on your machine, and what does that tell you?"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="h9" data-block="lab">
+          <div class="item-body">
+            <label class="item-label" for="h9">Count your accumulated volumes and clean up on purpose</label>
+            <p class="item-hint">Every <code>-v /app/node_modules</code> from session 4 left one behind, and database images declare their own. Look at the dangling list before pruning, and check nothing on it is something you want.</p>
+            <div class="cmd"><code>docker volume ls
+docker volume ls -f dangling=true
+docker system df
+docker volume prune</code><button class="copy" type="button">Copy</button></div>
+            <textarea class="note" data-note="h9" rows="2" placeholder="How many volumes had accumulated, and how much space did they hold?"></textarea>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- DELIVERABLE -->
+    <section class="block">
+      <div class="block-head">
+        <h3>Deliverable</h3>
+        <span class="count" data-count="ship">0/3</span>
+      </div>
+      <p class="block-note">Next session all of this collapses into about eight lines of Compose. Writing it out longhand once is what makes those eight lines readable.</p>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d1" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d1">Document your dev database setup in the repo</label>
+            <p class="item-hint">The run command, the volume name, and the backup and restore commands. The backup command especially — you will want it on a day when you are not calm.</p>
+            <textarea class="note tall" data-note="d1" rows="6" placeholder="## Local database&#10;Volume: &#10;Start: docker run …&#10;Back up: docker run --rm -v …&#10;Restore: &#10;"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d2" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d2">Write the persistence proof into <code>notes.md</code></label>
+            <p class="item-hint">The matrix plus one sentence on the surprising row. Anyone can claim they understand volumes; a table of things you tried is evidence.</p>
+            <textarea class="note" data-note="d2" rows="3" placeholder="The one that surprised me was…"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="item">
+        <div class="item-row">
+          <input type="checkbox" class="tick" id="d3" data-block="ship">
+          <div class="item-body">
+            <label class="item-label" for="d3">Commit, and tear down the scratch containers</label>
+            <p class="item-hint">You have five or six containers and several volumes from today. Remove the ones you named <code>db-*</code> and keep the volume you'll reuse in session 7.</p>
+            <textarea class="note" data-note="d3" rows="2" placeholder="One open question to bring into session 7:"></textarea>
+          </div>
+        </div>
+      </div>
+
+      <div class="pitfall">
+        <p><b>The two that cost people real data.</b></p>
+        <p><code>docker rm -v</code> does not delete named volumes — only anonymous ones. People learn that <code>-v</code> means "and the volumes", conclude volume cleanup is automatic, and then reach for <code>docker volume prune</code> or <code>docker system prune --volumes</code> to tidy up. Those two do delete named volumes, including the database you were using ten minutes ago. There is no undo.</p>
+        <p>Anonymous volumes pile up invisibly. Every container started without a named volume for a path the image declares gets a fresh one, kept forever. Check <code>docker volume ls</code> occasionally rather than after your disk fills.</p>
+      </div>
+
+      <div class="toolbar">
+        <button class="btn" type="button" id="export">Copy to notes.md</button>
+        <button class="btn ghost" type="button" id="complete">Mark session 6 complete</button>
+        <button class="btn quiet" type="button" id="reset">Clear saved work</button>
+        <span class="status" id="status"></span>
+      </div>
+    </section>
+  </main>
+
+  <aside class="tracker">
+    <h3>Course stack</h3>
+    <p class="lede">Ten layers on top of scratch. Session 6 fills as you tick items.</p>
+
+    <div class="crown" id="crown">docker-course:incomplete</div>
+    <div class="stack" id="stack"></div>
+    <div class="foot">FROM scratch</div>
+
+    <p class="tracker-meta" id="tracker-meta">0 of 10 sessions closed.</p>
+  </aside>
+</div>
+
+<script>
+  const SESSIONS = [
+    "The container mental model",
+    "Images, layers, and the CLI",
+    "Your first Dockerfile",
+    "Containerizing React and Next.js",
+    "Multi-stage builds and optimization",
+    "Volumes and persistence",
+    "Networking and Docker Compose",
+    "Configuration and secrets",
+    "Docker in CI/CD",
+    "Running containers in production"
+  ];
+
+  const THIS_SESSION = 6;
+  const KEY = "docker-course:session-6";
+  const BLOCK_TITLES = { theory: "Theory", lab: "Hands-on", ship: "Deliverable" };
+
+  const MATRIX_ROWS = [
+    ["docker restart", "p-restart-vol", "p-restart-none"],
+    ["docker rm, then recreate", "p-rm-vol", "p-rm-none"],
+    ["docker rm -v, then recreate", "p-rmv-vol", "p-rmv-none"],
+    ["docker volume rm", "p-vrm-vol", null]
+  ];
+
+  // sessions 1 to 5 assumed behind you — untick them if that's wrong
+  let state = {
+    ticks: {},
+    notes: {},
+    sessions: { 1: true, 2: true, 3: true, 4: true, 5: true }
+  };
+  let saveTimer = null;
+
+  const ticks    = Array.from(document.querySelectorAll(".tick"));
+  const fields   = Array.from(document.querySelectorAll("[data-note]"));
+  const statusEl = document.getElementById("status");
+
+  async function load() {
+    try {
+      const res = await window.storage.get(KEY);
+      if (res && res.value) {
+        const saved = JSON.parse(res.value);
+        state = Object.assign({ ticks: {}, notes: {}, sessions: {} }, saved);
+      }
+    } catch (e) {
+      // nothing saved yet, or storage unavailable — carry on with a blank sheet
+    }
+    hydrate();
+  }
+
+  function save() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(async () => {
+      try {
+        await window.storage.set(KEY, JSON.stringify(state));
+        flash("saved");
+      } catch (e) {
+        flash("not saved — working in this tab only");
+      }
+    }, 400);
+  }
+
+  function flash(msg) {
+    statusEl.textContent = msg;
+    statusEl.classList.add("show");
+    setTimeout(() => statusEl.classList.remove("show"), 1600);
+  }
+
+  function hydrate() {
+    ticks.forEach(t => { t.checked = !!state.ticks[t.id]; });
+    fields.forEach(f => { f.value = state.notes[f.dataset.note] || ""; });
+    render();
+  }
+
+  ticks.forEach(t => {
+    t.addEventListener("change", () => {
+      state.ticks[t.id] = t.checked;
+      render();
+      save();
+    });
+  });
+
+  fields.forEach(f => {
+    f.addEventListener("input", () => {
+      state.notes[f.dataset.note] = f.value;
+      save();
+    });
+  });
+
+  document.querySelectorAll(".copy").forEach(btn => {
+    btn.addEventListener("click", async () => {
+      const text = btn.parentElement.querySelector("code").textContent;
+      try {
+        await navigator.clipboard.writeText(text);
+        btn.textContent = "Copied";
+      } catch (e) {
+        btn.textContent = "Select it";
+      }
+      setTimeout(() => { btn.textContent = "Copy"; }, 1400);
+    });
+  });
+
+  const stackEl = document.getElementById("stack");
+
+  SESSIONS.forEach((name, i) => {
+    const n = i + 1;
+    const row = document.createElement("div");
+    row.className = "layer";
+    row.dataset.session = n;
+    row.setAttribute("role", "button");
+    row.setAttribute("tabindex", "0");
+    row.innerHTML =
+      '<div class="layer-fill"></div>' +
+      '<span class="layer-no">' + String(n).padStart(2, "0") + '</span>' +
+      '<span class="layer-name">' + name + '</span>' +
+      '<span class="layer-mark"></span>';
+
+    const toggle = () => {
+      state.sessions[n] = !state.sessions[n];
+      render();
+      save();
+    };
+
+    row.addEventListener("click", toggle);
+    row.addEventListener("keydown", ev => {
+      if (ev.key === "Enter" || ev.key === " ") { ev.preventDefault(); toggle(); }
+    });
+
+    stackEl.appendChild(row);
+  });
+
+  function render() {
+    const total = ticks.length;
+    const done = ticks.filter(t => t.checked).length;
+
+    document.getElementById("gauge-fill").style.width = (done / total * 100) + "%";
+    document.getElementById("gauge-label").textContent = done + "/" + total;
+
+    document.querySelectorAll("[data-count]").forEach(el => {
+      const block = el.dataset.count;
+      const group = ticks.filter(t => t.dataset.block === block);
+      el.textContent = group.filter(t => t.checked).length + "/" + group.length;
+    });
+
+    const closed = Object.values(state.sessions).filter(Boolean).length;
+
+    document.querySelectorAll(".layer").forEach(row => {
+      const n = Number(row.dataset.session);
+      const isDone = !!state.sessions[n];
+      row.classList.toggle("done", isDone);
+      row.classList.toggle("current", n === THIS_SESSION && !isDone);
+      const pct = isDone ? 100 : (n === THIS_SESSION ? done / total * 100 : 0);
+      row.querySelector(".layer-fill").style.width = pct + "%";
+      row.setAttribute("aria-pressed", String(isDone));
+    });
+
+    const crown = document.getElementById("crown");
+    crown.textContent = closed === 10 ? "docker-course:v1  built" : "docker-course:incomplete";
+    crown.classList.toggle("earned", closed === 10);
+
+    document.getElementById("tracker-meta").textContent = closed + " of 10 sessions closed.";
+  }
+
+  document.getElementById("complete").addEventListener("click", () => {
+    state.sessions[THIS_SESSION] = true;
+    render();
+    save();
+    flash("session 6 closed");
+  });
+
+  document.getElementById("reset").addEventListener("click", async () => {
+    if (!confirm("Clear every tick and note on this sheet?")) return;
+    state = {
+      ticks: {},
+      notes: {},
+      sessions: { 1: true, 2: true, 3: true, 4: true, 5: true }
+    };
+    try { await window.storage.delete(KEY); } catch (e) {}
+    hydrate();
+    flash("cleared");
+  });
+
+  document.getElementById("export").addEventListener("click", async () => {
+    const total = ticks.length;
+    const done = ticks.filter(t => t.checked).length;
+
+    let md = "# Session 6 — Volumes and persistence\n\n";
+    md += "Progress: " + done + "/" + total + " items\n";
+
+    let current = null;
+    ticks.forEach(t => {
+      if (t.dataset.block !== current) {
+        current = t.dataset.block;
+        md += "\n## " + BLOCK_TITLES[current] + "\n\n";
+      }
+      const label = t.parentElement.querySelector(".item-label").textContent.trim();
+      md += "- [" + (t.checked ? "x" : " ") + "] " + label + "\n";
+
+      if (t.id === "h4") {
+        md += "\n  | Operation | Named volume | No volume |\n  |---|---|---|\n";
+        MATRIX_ROWS.forEach(r => {
+          const none = r[2] ? (state.notes[r[2]] || "—") : "n/a";
+          md += "  | `" + r[0] + "` | " + (state.notes[r[1]] || "—") + " | " + none + " |\n";
+        });
+        md += "\n";
+        return;
+      }
+
+      const note = (state.notes[t.id] || "").trim();
+      if (note) {
+        note.split("\n").forEach(line => { md += "  > " + line + "\n"; });
+      }
+    });
+
+    md += "\n";
+
+    try {
+      await navigator.clipboard.writeText(md);
+      flash("markdown copied");
+    } catch (e) {
+      flash("clipboard blocked — copy manually");
+      console.log(md);
+    }
+  });
+
+  load();
+</script>
