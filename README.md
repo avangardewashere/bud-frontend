@@ -20,7 +20,14 @@ That starts two servers, on purpose:
 
 They must stay on **different hosts**, not just different ports: cookies ignore ports, so `localhost` vs `127.0.0.1` is what keeps course JavaScript away from the session cookie in development. Ports 3100/3101 rather than 3000/3001 because both of those were already in use on the dev machine; override with `COURSES_PORT` and `next dev -p`.
 
-The bridge spike is at http://localhost:3100/spike — session 1 of the Docker course, unmodified, persisting through the bridge into an in-memory store.
+Auth needs a third process, the API from the sibling `Bud - backend` project, on **http://localhost:3102** (`npm run start:dev` there, with its Postgres container up). Its CORS allows `http://localhost:3100` and nothing else — reaching the shell on `127.0.0.1:3100` is a different host, so the preflight fails and the cookie would not match anyway.
+
+Three pages worth opening:
+
+- **http://localhost:3100/dev/auth** — the auth harness. Signs in with the typed client against the real API and shows what `/me` returns. Throwaway: block 5 replaces it with the designed login screen.
+
+- **http://localhost:3100/brand** — the brand gallery. Every piece of artwork at every size the screens use: Bud's three poses, the mark and wordmark, the growth meter across course lengths, and the fallback course cover. Kept as a living styleguide and used as the target for `e2e/brand.spec.ts`.
+- **http://localhost:3100/spike** — the bridge spike. Session 1 of the Docker course, unmodified, persisting through the bridge into an in-memory store.
 
 ## Checks
 
@@ -30,7 +37,17 @@ npx eslint src e2e tools
 npx playwright test
 ```
 
-`npx eslint .` works but is slow; it walks the build output.
+`npx eslint .` works but is slow; it walks the build output. `e2e/auth.spec.ts` skips with a message when the API is not running, so a red suite always means the frontend broke.
+
+## The API contract
+
+`src/lib/api/schema.d.ts` is generated from the backend's own OpenAPI document and committed, so the repo typechecks without the API running. Regenerate it whenever the backend changes the spec:
+
+```bash
+npm run api:types
+```
+
+The backend publishes the spec at `http://localhost:3102/docs/openapi.json` (Swagger UI at `/docs`) and is the single source of truth for it — the frontend never hand-writes a request or response shape. Everything else in `src/lib/api/` is a thin layer over that: `credentials: "include"` on every call, since the session is an httpOnly cookie, and non-2xx responses turned into a `BudApiError` carrying the API's error envelope.
 
 ## Layout
 

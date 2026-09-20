@@ -20,7 +20,8 @@ export default defineConfig({
       command: "npm run dev:web",
       url: "http://localhost:3100",
       reuseExistingServer: true,
-      timeout: 120_000,
+      // A cold Turbopack start on this machine's filesystem regularly passes 120s.
+      timeout: 240_000,
     },
     {
       command: "npm run courses",
