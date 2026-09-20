@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { ADMIN, skipWithoutApi } from "./support/api";
 
 /**
  * Block 2 — the typed client against the real API.
@@ -10,31 +11,11 @@ import { test, expect, type Page } from "@playwright/test";
  * Credentials come from the backend's seed (SEED_ADMIN_PASSWORD in its .env).
  */
 
-const API = "http://localhost:3102";
-const ADMIN = { email: "admin@bud.local", password: "bud-dev-admin-pw" };
-
-let apiUp: boolean | undefined;
-
-async function apiReachable(page: Page) {
-  if (apiUp === undefined) {
-    try {
-      const res = await page.request.get(`${API}/ready`, { timeout: 5000 });
-      apiUp = res.ok();
-    } catch {
-      apiUp = false;
-    }
-  }
-  return apiUp;
-}
-
 const status = (page: Page) => page.getByTestId("status");
 const user = (page: Page) => page.getByTestId("user");
 
 test.beforeEach(async ({ page }) => {
-  test.skip(
-    !(await apiReachable(page)),
-    `Bud API not reachable at ${API} — start it with "npm run start:dev" in "Bud - backend".`,
-  );
+  await skipWithoutApi(page);
   await page.goto("/dev/auth");
 });
 
