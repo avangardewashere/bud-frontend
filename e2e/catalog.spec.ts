@@ -76,9 +76,12 @@ test("enrolling shows progress, and the dashboard stops saying nothing is plante
   await page.goto(`/courses/${DOCKER.slug}`);
   await page.getByRole("button", { name: "Start this course" }).click();
 
-  // Enrolled: the meter is at zero of ten and the player is promised, not linked.
+  // Enrolled: the meter is at zero of ten and Continue now opens the player.
   await expect(page.getByText("0 / 10")).toBeVisible();
-  await expect(page.getByRole("button", { name: /Continue · Session 1/ })).toBeDisabled();
+  await expect(page.getByRole("link", { name: /Session 1/ })).toHaveAttribute(
+    "href",
+    "/learn/docker-fundamentals/s1",
+  );
   await expect(page.getByRole("button", { name: "Unenroll" })).toBeVisible();
 
   await page.goto("/dashboard");

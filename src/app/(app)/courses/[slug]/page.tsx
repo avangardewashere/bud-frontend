@@ -6,7 +6,7 @@ import { EnrollButton } from "@/components/course/EnrollButton";
 import { Outline } from "@/components/course/Outline";
 import { SessionList } from "@/components/course/SessionList";
 import { TagList, VersionPill } from "@/components/course/meta";
-import { Button } from "@/components/ui/Button";
+import { ButtonLink } from "@/components/ui/Button";
 import { BudApiError, budApi, type CourseDetail } from "@/lib/api";
 import { serverAuth } from "@/lib/api/session";
 
@@ -93,16 +93,13 @@ export default async function CoursePage({ params }: Params) {
 
             <div className="mt-5">
               {progress ? (
-                <>
-                  {/* The player is block 7. A disabled control is honest; a link to a
-                      route that does not exist is not. */}
-                  <Button disabled className="w-full">
-                    Continue · Session {nextSession(course)}
-                  </Button>
-                  <p className="mt-2 text-center text-xs text-[var(--muted-foreground)]">
-                    The course player arrives next.
-                  </p>
-                </>
+                <ButtonLink
+                  href={`/learn/${course.slug}/${resumeKey(course)}`}
+                  className="w-full"
+                >
+                  {progress.lastSessionKey ? "Continue" : "Start"} · Session{" "}
+                  {nextSession(course)}
+                </ButtonLink>
               ) : (
                 <EnrollButton slug={course.slug} enrolled={false} />
               )}
@@ -136,6 +133,23 @@ function remaining(course: CourseDetail, percent: number) {
 
 /** The first session that is not finished, which is where Continue should land. */
 function nextSession(course: CourseDetail) {
-  const next = course.sessions.find((s) => s.status !== "complete");
-  return next ? next.order : course.sessionCount;
+  return unfinished(course)?.order ?? course.sessionCount;
+}
+
+/**
+ * Where Continue goes: the session they last opened if they have not finished it,
+ * otherwise the first unfinished one, otherwise the last — so a finished course
+ * reopens somewhere sensible rather than nowhere.
+ */
+function resumeKey(course: CourseDetail) {
+  const last = course.enrollment?.lastSessionKey;
+  const lastSession = course.sessions.find((s) => s.key === last);
+  if (lastSession && lastSession.status !== "complete") return lastSession.key;
+  return (unfinished(course) ?? course.sessions.at(-1))?.key ?? "";
+}
+
+function unfinished(course: CourseDetail) {
+  return [...course.sessions]
+    .sort((a, b) => a.order - b.order)
+    .find((s) => s.status !== "complete");
 }

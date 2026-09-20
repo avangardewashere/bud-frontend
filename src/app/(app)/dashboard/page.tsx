@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { Bud } from "@/components/bud";
+import { ContinueCard } from "@/components/course/ContinueCard";
 import { CourseCard } from "@/components/course/CourseCard";
 import { ButtonLink } from "@/components/ui/Button";
-import { budApi } from "@/lib/api";
+import { budApi, type Dashboard } from "@/lib/api";
 import { getSessionUser, serverAuth } from "@/lib/api/session";
 
 export const metadata: Metadata = { title: "Dashboard — Bud" };
@@ -19,7 +20,10 @@ export const metadata: Metadata = { title: "Dashboard — Bud" };
 export default async function DashboardPage() {
   // The layout has already redirected anyone without a session.
   const [user, auth] = await Promise.all([getSessionUser(), serverAuth()]);
-  const { courses } = await budApi.listCourses(auth);
+  const [{ courses }, dashboard] = await Promise.all([
+    budApi.listCourses(auth),
+    budApi.dashboard(auth),
+  ]);
   const enrolled = courses.filter((course) => course.enrollment !== null);
 
   return (
@@ -29,12 +33,20 @@ export default async function DashboardPage() {
         <div>
           <h1 className="text-4xl">Welcome back, {firstName(user!.name)}.</h1>
           <p className="mt-1 text-[var(--muted-foreground)]">
-            {enrolled.length === 0
-              ? "Nothing is growing yet. Bud will keep track once you start a course."
-              : "Bud has been keeping track."}
+            {greeting(dashboard)}
           </p>
         </div>
       </div>
+
+      {dashboard.continueCard && (
+        <div className="mt-8">
+          <ContinueCard
+            card={dashboard.continueCard}
+            completedSessions={dashboard.totals.completedSessions}
+            totalSessions={dashboard.totals.totalSessions}
+          />
+        </div>
+      )}
 
       {enrolled.length === 0 ? (
         <section className="mt-12 rounded-[var(--radius-panel)] border border-[var(--border)] bg-[var(--card)] px-6 py-16 text-center">
@@ -81,6 +93,17 @@ export default async function DashboardPage() {
       )}
     </main>
   );
+}
+
+/** Design.md §8: warm and specific, never "Ready to crush it?!". */
+function greeting({ totals, continueCard }: Dashboard) {
+  if (totals.enrolledCourses === 0) {
+    return "Nothing is growing yet. Bud will keep track once you start a course.";
+  }
+  if (!continueCard) return "Every course finished. Bud is very pleased.";
+  return continueCard.resuming
+    ? `Session ${continueCard.sessionOrder} is where you left off.`
+    : "Bud has been keeping track.";
 }
 
 /** "Welcome back, Ari." — the greeting uses the first name only (Design.md §8). */

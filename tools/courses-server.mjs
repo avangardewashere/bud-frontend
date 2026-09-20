@@ -15,7 +15,7 @@
  */
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
-import { stat, readFile } from "node:fs/promises";
+import { stat, readFile, readdir } from "node:fs/promises";
 import { join, normalize, extname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -79,6 +79,39 @@ function inject(html) {
   return `${BRIDGE_TAG}\n${html}`;
 }
 
+/**
+ * Dev-only: fall back to whatever version of a course is on disk.
+ *
+ * The API addresses content as /{course}/{version}/{path} and the real origin serves
+ * it out of object storage, where every ingested version exists. These local fixtures
+ * are a copy of one version, so a re-ingest on the backend moves the version and every
+ * request 404s. Serving the version that is here, loudly, beats a blank frame — but it
+ * is a stand-in, and the warning is there so nobody mistakes it for the real thing.
+ */
+async function fallbackVersion(urlPath) {
+  const [, course, version, ...rest] = urlPath.split("/");
+  if (!course || !version || rest.length === 0) return null;
+
+  let available;
+  try {
+    available = (await readdir(join(ROOT, course), { withFileTypes: true }))
+      .filter((entry) => entry.isDirectory())
+      .map((entry) => entry.name)
+      .sort();
+  } catch {
+    return null;
+  }
+
+  const substitute = available.at(-1);
+  if (!substitute || substitute === version) return null;
+
+  console.warn(
+    `! ${course}: no local copy of ${version}; serving ${substitute} instead. ` +
+      `These fixtures are a stand-in for object storage.`,
+  );
+  return `/${course}/${substitute}/${rest.join("/")}`;
+}
+
 function resolveSafe(urlPath) {
   let decoded;
   try {
@@ -107,14 +140,22 @@ const server = createServer(async (req, res) => {
     return send(200, "ok", { "content-type": "text/plain" });
   }
 
-  const file = resolveSafe(url.pathname);
+  let file = resolveSafe(url.pathname);
   if (!file) return send(403, "forbidden", { "content-type": "text/plain" });
 
   let info;
   try {
     info = await stat(file);
   } catch {
-    return send(404, "not found", { "content-type": "text/plain" });
+    const substitute = await fallbackVersion(url.pathname);
+    const retry = substitute && resolveSafe(substitute);
+    if (!retry) return send(404, "not found", { "content-type": "text/plain" });
+    try {
+      info = await stat(retry);
+      file = retry;
+    } catch {
+      return send(404, "not found", { "content-type": "text/plain" });
+    }
   }
   if (!info.isFile()) return send(404, "not found", { "content-type": "text/plain" });
 

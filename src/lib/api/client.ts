@@ -29,6 +29,10 @@ export type CourseDetail = components["schemas"]["CourseDetail"];
 export type CourseSession = components["schemas"]["CourseSession"];
 export type CourseList = components["schemas"]["CourseList"];
 export type ProgressSummary = components["schemas"]["ProgressSummary"];
+export type Dashboard = components["schemas"]["Dashboard"];
+export type StateValue = components["schemas"]["StateValue"];
+export type SessionProgress = components["schemas"]["SessionProgress"];
+export type SessionProgressList = components["schemas"]["SessionProgressList"];
 
 type JsonBody<O extends keyof operations> = operations[O] extends {
   requestBody: { content: { "application/json": infer B } };
@@ -41,6 +45,12 @@ export type RegisterBody = JsonBody<"AuthController_register">;
 export type ChangePasswordBody = JsonBody<"AuthController_changePassword">;
 
 const DEFAULT_BASE_URL = "http://localhost:3102";
+
+const statePath = (slug: string, key: string) =>
+  `/me/courses/${encodeURIComponent(slug)}/state/${encodeURIComponent(key)}`;
+
+const sessionPath = (slug: string, sessionKey: string) =>
+  `/me/courses/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(sessionKey)}`;
 
 export function apiBaseUrl() {
   return (process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
@@ -180,6 +190,82 @@ export const budApi = {
     await request<void>(
       "DELETE",
       `/courses/${encodeURIComponent(slug)}/enroll`,
+      undefined,
+      options,
+    );
+  },
+
+  /** The Continue card, the enrolled courses and cross-course totals. */
+  async dashboard(options?: RequestOptions): Promise<Dashboard> {
+    return request<Dashboard>("GET", "/me/dashboard", undefined, options);
+  },
+
+  /**
+   * The bridge's three state calls. `key` is opaque and course-chosen, so it is
+   * always encoded — the Docker course's keys contain a colon.
+   */
+  async getState(slug: string, key: string, options?: RequestOptions): Promise<StateValue> {
+    return request<StateValue>("GET", statePath(slug, key), undefined, options);
+  },
+
+  async putState(
+    slug: string,
+    key: string,
+    value: string,
+    options?: RequestOptions,
+  ): Promise<void> {
+    await request<void>("PUT", statePath(slug, key), { value }, options);
+  },
+
+  async deleteState(slug: string, key: string, options?: RequestOptions): Promise<void> {
+    await request<void>("DELETE", statePath(slug, key), undefined, options);
+  },
+
+  /** Records that a session was opened; drives "resume where you left off". */
+  async openSession(
+    slug: string,
+    sessionKey: string,
+    options?: RequestOptions,
+  ): Promise<SessionProgress> {
+    return request<SessionProgress>("POST", `${sessionPath(slug, sessionKey)}/open`, undefined, options);
+  },
+
+  /** Fine-grained progress from a course that reports it. Never moves backwards. */
+  async reportProgress(
+    slug: string,
+    sessionKey: string,
+    fraction: number,
+    options?: RequestOptions,
+  ): Promise<SessionProgress> {
+    return request<SessionProgress>(
+      "POST",
+      `${sessionPath(slug, sessionKey)}/progress`,
+      { fraction },
+      options,
+    );
+  },
+
+  async completeSession(
+    slug: string,
+    sessionKey: string,
+    options?: RequestOptions,
+  ): Promise<SessionProgress> {
+    return request<SessionProgress>(
+      "POST",
+      `${sessionPath(slug, sessionKey)}/complete`,
+      undefined,
+      options,
+    );
+  },
+
+  async uncompleteSession(
+    slug: string,
+    sessionKey: string,
+    options?: RequestOptions,
+  ): Promise<SessionProgress> {
+    return request<SessionProgress>(
+      "DELETE",
+      `${sessionPath(slug, sessionKey)}/complete`,
       undefined,
       options,
     );
