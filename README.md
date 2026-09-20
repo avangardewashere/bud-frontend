@@ -1,4 +1,4 @@
-# Bud — frontend (`budlearn-web`)
+# Bud — frontend (`bud-web`)
 
 The Bud shell: accounts, catalog, dashboard, player, admin. Courses run inside it in a sandboxed iframe on a separate origin and report progress through a small `postMessage` bridge.
 

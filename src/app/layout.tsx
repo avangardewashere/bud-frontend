@@ -21,10 +21,10 @@ const jetbrainsMono = JetBrains_Mono({
   weight: ["400", "500"],
 });
 
+/** The favicon comes from src/app/icon.svg via Next's file convention. */
 export const metadata: Metadata = {
   title: "Bud",
   description: "A learning platform where every course keeps its own personality.",
-  icons: { icon: "/brand/icon.svg" },
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
