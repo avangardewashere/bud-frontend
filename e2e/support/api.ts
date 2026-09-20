@@ -17,6 +17,23 @@ export const ADMIN = {
   firstName: "Bud",
 };
 
+/**
+ * A learner with no enrolments.
+ *
+ * Anything that changes enrolment or progress runs as this user, not the admin:
+ * both sessions working on Bud share one database, and the admin account collects
+ * whatever the backend's own testing leaves behind — it already carries a completed
+ * session and a deliberately mistyped storage key. Tests that assume a clean slate
+ * have to own the account they assume it about.
+ *
+ * Admin-only assertions (the Admin nav item) stay on ADMIN, since this user is a
+ * learner and correctly cannot see them.
+ */
+export const LEARNER = {
+  email: "learner@bud.local",
+  password: "learner-password-123",
+};
+
 let reachable: boolean | undefined;
 
 export async function apiReachable(page: Page) {
@@ -39,10 +56,13 @@ export async function skipWithoutApi(page: Page) {
 }
 
 /** Signs in through the real login screen and waits for the dashboard. */
-export async function signIn(page: Page) {
+export async function signIn(
+  page: Page,
+  who: { email: string; password: string } = ADMIN,
+) {
   await page.goto("/login");
-  await page.getByLabel("Email").fill(ADMIN.email);
-  await page.getByLabel("Password").fill(ADMIN.password);
+  await page.getByLabel("Email").fill(who.email);
+  await page.getByLabel("Password").fill(who.password);
   // "Continue" alone also matches "Continue with GitHub".
   await page.getByRole("button", { name: "Continue", exact: true }).click();
   await page.waitForURL("**/dashboard");

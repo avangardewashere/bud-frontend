@@ -17,6 +17,16 @@ export type FieldError = NonNullable<ErrorResponse["errors"]>[number];
 export class BudApiError extends Error {
   readonly statusCode: number;
   readonly error: string;
+  /**
+   * The stable machine-readable reason, e.g. "not_enrolled", "unknown_session",
+   * "storage_quota_exceeded". Branch on this rather than the message, which is
+   * free to be reworded, or the status, which several reasons share.
+   *
+   * Empty only when the response never reached the API's own error handler — a
+   * proxy or a framework-level 413, say — so treat "" as "cause unknown".
+   */
+  readonly code: string;
+  readonly detail?: string;
   readonly fieldErrors: FieldError[];
   readonly path?: string;
   readonly timestamp?: string;
@@ -27,6 +37,8 @@ export class BudApiError extends Error {
     this.name = "BudApiError";
     this.statusCode = body?.statusCode ?? statusCode;
     this.error = body?.error ?? fallback;
+    this.code = body?.code ?? "";
+    this.detail = body?.detail;
     this.fieldErrors = body?.errors ?? [];
     this.path = body?.path;
     this.timestamp = body?.timestamp;
@@ -35,6 +47,14 @@ export class BudApiError extends Error {
   /** 401 means "not signed in", which callers handle differently from a real failure. */
   get isUnauthorized() {
     return this.statusCode === 401;
+  }
+
+  /**
+   * Retrying will not help: a limit, a missing session, not being enrolled. The
+   * player uses this to decide between backing off and telling the learner.
+   */
+  get isPermanent() {
+    return this.statusCode >= 400 && this.statusCode < 500 && this.statusCode !== 429;
   }
 }
 

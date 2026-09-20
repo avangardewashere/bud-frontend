@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { signIn, skipWithoutApi } from "./support/api";
+import { LEARNER, signIn, skipWithoutApi } from "./support/api";
 
 /**
  * Block 6 — catalog (mockup 1e) and course detail (1f), against the real API with
@@ -22,7 +22,9 @@ async function ensureUnenrolled(page: Page) {
 
 test.beforeEach(async ({ page }) => {
   await skipWithoutApi(page);
-  await signIn(page);
+  // The learner, not the admin: these tests enrol and unenrol, and the admin
+  // account carries the backend session's own test progress.
+  await signIn(page, LEARNER);
 });
 
 test("the catalog lists the Docker course with its manifest metadata", async ({ page }) => {

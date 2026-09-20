@@ -200,6 +200,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/admin/courses/{id}/storage-keys": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Storage keys learners actually use, against what the manifest declares
+         * @description Undeclared keys are accepted at write time — rejecting would punish the learner for the author’s mistake — so drift surfaces here instead, in the author’s workflow, where it can be fixed without interrupting anybody.
+         */
+        get: operations["AdminCoursesController_storageKeys"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/admin/courses/{id}": {
         parameters: {
             query?: never;
@@ -218,6 +238,132 @@ export interface paths {
          * @description Publishing requires a version to publish: a course with no versions has nothing to show a learner.
          */
         patch: operations["AdminCoursesController_update"];
+        trace?: never;
+    };
+    "/me/dashboard": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everything the learner is working on
+         * @description One round trip on purpose: this is the first screen after sign-in, and assembling it from three calls would let the slowest decide how the app feels.
+         */
+        get: operations["ProgressController_getDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/courses/{slug}/state/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * bridge: storage.get
+         * @description A key that was never written returns `{ value: null }` rather than 404, because that is the shape the existing worksheets already handle.
+         */
+        get: operations["ProgressController_getState"];
+        /**
+         * bridge: storage.set
+         * @description Whole value, last write wins — no partial patches. Keys the manifest did not declare are accepted: rejecting would punish the learner for the author’s mistake, since the worksheet turns a rejection into a small "not saved" flash that is easy to miss.
+         */
+        put: operations["ProgressController_setState"];
+        post?: never;
+        /**
+         * bridge: storage.delete
+         * @description Every worksheet’s "Clear saved work" calls this. Deleting a key that was never there succeeds — the caller wanted it gone, and it is gone.
+         */
+        delete: operations["ProgressController_deleteState"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/courses/{slug}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Progress through every session of a course */
+        get: operations["ProgressController_sessions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/courses/{slug}/sessions/{key}/open": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * The learner opened a session
+         * @description Drives "continue where you left off". Never un-completes a finished session.
+         */
+        post: operations["ProgressController_open"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/courses/{slug}/sessions/{key}/progress": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * bridge: bud.progress
+         * @description Optional fine-grained progress. Never moves backwards.
+         */
+        post: operations["ProgressController_setFraction"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/courses/{slug}/sessions/{key}/complete": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * bridge: bud.complete
+         * @description The course suggests completion; the shell records it. Shell state is the source of truth and is never synced back into the course’s own blob.
+         */
+        post: operations["ProgressController_complete"];
+        /** Reopen a session marked complete by mistake */
+        delete: operations["ProgressController_uncomplete"];
+        options?: never;
+        head?: never;
+        patch?: never;
         trace?: never;
     };
     "/health": {
@@ -280,7 +426,9 @@ export interface components {
         ErrorResponse: {
             statusCode: number;
             error: string;
+            code: string;
             message: string;
+            detail?: string;
             errors?: {
                 path: string;
                 message: string;
@@ -461,6 +609,71 @@ export interface components {
                 version: string | null;
                 filesStored: number;
             } | null;
+        };
+        CourseStorageKeys: {
+            slug: string;
+            version: string | null;
+            declared: string[];
+            undeclared: {
+                key: string;
+                learners: number;
+            }[];
+            unused: string[];
+        };
+        StateValue: {
+            value: string | null;
+        };
+        SessionProgress: {
+            sessionKey: string;
+            /** @enum {string} */
+            status: "not_started" | "in_progress" | "complete";
+            fraction: number | null;
+            /** Format: date-time */
+            startedAt: string | null;
+            /** Format: date-time */
+            completedAt: string | null;
+        };
+        SessionProgressList: {
+            sessionKey: string;
+            /** @enum {string} */
+            status: "not_started" | "in_progress" | "complete";
+            fraction: number | null;
+            /** Format: date-time */
+            startedAt: string | null;
+            /** Format: date-time */
+            completedAt: string | null;
+        }[];
+        Dashboard: {
+            continueCard: {
+                slug: string;
+                title: string;
+                accentColor: string | null;
+                sessionKey: string;
+                sessionTitle: string;
+                sessionOrder: number;
+                weight: string | null;
+                percent: number;
+                resuming: boolean;
+            } | null;
+            courses: {
+                slug: string;
+                title: string;
+                accentColor: string | null;
+                coverUrl: string | null;
+                completedSessions: number;
+                totalSessions: number;
+                percent: number;
+                /** Format: date-time */
+                lastOpenedAt: string | null;
+                /** Format: date-time */
+                completedAt: string | null;
+            }[];
+            totals: {
+                enrolledCourses: number;
+                completedCourses: number;
+                completedSessions: number;
+                totalSessions: number;
+            };
         };
     };
     responses: never;
@@ -829,6 +1042,28 @@ export interface operations {
             };
         };
     };
+    AdminCoursesController_storageKeys: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Declared and observed keys. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseStorageKeys"];
+                };
+            };
+        };
+    };
     AdminCoursesController_update: {
         parameters: {
             query?: never;
@@ -855,6 +1090,263 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["AdminCourse"];
+                };
+            };
+        };
+    };
+    ProgressController_getDashboard: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The dashboard. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+        };
+    };
+    ProgressController_getState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                /** @description Opaque course-chosen key. */
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The stored value, or null. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["StateValue"];
+                };
+            };
+            /** @description Not enrolled. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ProgressController_setState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    value: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Saved. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not enrolled. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description storage_key_limit_reached — too many distinct keys. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            /** @description storage_value_too_large, or storage_quota_exceeded. */
+            413: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ProgressController_deleteState: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gone. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ProgressController_sessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Per-session progress. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionProgressList"];
+                };
+            };
+        };
+    };
+    ProgressController_open: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated progress. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionProgress"];
+                };
+            };
+            /** @description unknown_session. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    ProgressController_setFraction: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    fraction: number;
+                };
+            };
+        };
+        responses: {
+            /** @description Updated progress. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionProgress"];
+                };
+            };
+        };
+    };
+    ProgressController_complete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated progress. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionProgress"];
+                };
+            };
+        };
+    };
+    ProgressController_uncomplete: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Updated progress. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SessionProgress"];
                 };
             };
         };
