@@ -4,7 +4,7 @@
  * Course HTML is author-controlled JavaScript. It must never run on the same
  * origin as the shell, or it could read the session cookie and the shell's DOM.
  * In production this is courses.<domain>; here it is 127.0.0.1:3101, which the
- * browser treats as a different origin from localhost:3000 — different host,
+ * browser treats as a different origin from localhost:3100 — different host,
  * different origin, same isolation. (3101 rather than 3001 because 3001 is
  * often already taken; override with COURSES_PORT.)
  *
@@ -22,7 +22,7 @@ import { fileURLToPath } from "node:url";
 const ROOT = fileURLToPath(new URL("../courses/", import.meta.url));
 const PORT = Number(process.env.COURSES_PORT ?? 3101);
 const HOST = process.env.COURSES_HOST ?? "127.0.0.1";
-const APP_ORIGIN = process.env.APP_ORIGIN ?? "http://localhost:3000";
+const APP_ORIGIN = process.env.APP_ORIGIN ?? "http://localhost:3100";
 const COURSES_ORIGIN = process.env.COURSES_ORIGIN ?? `http://${HOST}:${PORT}`;
 
 /** Allowlist doubles as the upload allowlist in Tech-Information.md §11. */
@@ -93,6 +93,7 @@ function resolveSafe(urlPath) {
 
 const server = createServer(async (req, res) => {
   const send = (code, body, headers = {}) => {
+    console.log(`${code} ${req.method} ${req.url}`);
     res.writeHead(code, { "x-content-type-options": "nosniff", ...headers });
     res.end(body);
   };
@@ -131,6 +132,7 @@ const server = createServer(async (req, res) => {
     return send(200, inject(await readFile(file, "utf8")), headers);
   }
 
+  console.log(`200 ${req.method} ${req.url}`);
   res.writeHead(200, { "x-content-type-options": "nosniff", ...headers });
   createReadStream(file).pipe(res);
 });

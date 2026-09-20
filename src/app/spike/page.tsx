@@ -98,6 +98,18 @@ export default function SpikePage() {
     }
 
     window.addEventListener("message", onMessage);
+
+    /**
+     * The course is only loaded once the listener exists. With src in the
+     * server-rendered markup, the frame starts loading before hydration; the
+     * worksheet's storage.get fires on load, reaches a parent that is not
+     * listening yet, and is lost — the course then silently starts from a blank
+     * sheet. Found by the M1 spike.
+     */
+    if (frameRef.current && !frameRef.current.src) {
+      frameRef.current.src = `${COURSES_ORIGIN}${ENTRY}`;
+    }
+
     return () => window.removeEventListener("message", onMessage);
   }, [push]);
 
@@ -115,10 +127,16 @@ export default function SpikePage() {
         <iframe
           ref={frameRef}
           title="Docker session 1"
-          src={`${COURSES_ORIGIN}${ENTRY}`}
-          /* No allow-same-origin. That is the point: the frame gets an opaque
-             origin and cannot reach this document's cookies, storage or DOM. */
-          sandbox="allow-scripts allow-forms allow-popups"
+          /* No src here — the effect sets it once the listener is attached.
+             No allow-same-origin. That is the point: the frame gets an opaque
+             origin and cannot reach this document's cookies, storage or DOM.
+             allow-modals: every worksheet confirm()s before "reset", and without
+             it confirm() returns false and the reset silently does nothing.
+             Dialogs grant no access to anything, so the boundary is unchanged. */
+          sandbox="allow-scripts allow-forms allow-popups allow-modals"
+          /* Export and the copy buttons use navigator.clipboard.writeText, which a
+             cross-origin frame only gets when delegated. Write-only; no read. */
+          allow="clipboard-write"
           className="h-full w-full rounded-[var(--radius-card)] border border-[var(--border)] bg-white"
         />
 
