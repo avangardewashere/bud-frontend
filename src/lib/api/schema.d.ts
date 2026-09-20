@@ -95,6 +95,131 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/course-spec/schema": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The bud.manifest.json JSON Schema
+         * @description JSON Schema (draft 2020-12) for spec bud-course/1, plus the limits and validation codes the uploader enforces.
+         */
+        get: operations["CourseSpecController_schema"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The catalog
+         * @description Published courses only, newest last. Includes the caller’s progress for any course they are enrolled in.
+         */
+        get: operations["CoursesController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{slug}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * One course, with its outline and session list
+         * @description Unpublished courses are indistinguishable from missing ones.
+         */
+        get: operations["CoursesController_detail"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/courses/{slug}/enroll": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Enrol in a course
+         * @description Idempotent, and re-enrolling after leaving resumes rather than resets.
+         */
+        post: operations["CoursesController_enroll"];
+        /**
+         * Leave a course
+         * @description Keeps progress, so re-enrolling picks up where it left off.
+         */
+        delete: operations["CoursesController_unenroll"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/courses": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Every course, including drafts and archived ones */
+        get: operations["AdminCoursesController_list"];
+        put?: never;
+        /**
+         * Upload a course package
+         * @description Validates the zip and, if it passes, stores its files and creates a **draft** version. Publishing is a separate, deliberate step. A failed validation returns 200 with ok=false and the checklist — the upload worked, the package did not.
+         */
+        post: operations["AdminCoursesController_upload"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/admin/courses/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Publish, unpublish, archive, or point at a different version
+         * @description Publishing requires a version to publish: a course with no versions has nothing to show a learner.
+         */
+        patch: operations["AdminCoursesController_update"];
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -164,6 +289,178 @@ export interface components {
             path: string;
             /** Format: date-time */
             timestamp: string;
+        };
+        ProgressSummary: {
+            completedSessions: number;
+            totalSessions: number;
+            percent: number;
+            lastSessionKey: string | null;
+            /** Format: date-time */
+            lastOpenedAt: string | null;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            completedAt: string | null;
+        };
+        CourseSummary: {
+            slug: string;
+            title: string;
+            summary: string;
+            level: string | null;
+            estimatedHours: number | null;
+            tags: string[];
+            accentColor: string | null;
+            coverUrl: string | null;
+            sessionCount: number;
+            version: string;
+            enrollment: {
+                completedSessions: number;
+                totalSessions: number;
+                percent: number;
+                lastSessionKey: string | null;
+                /** Format: date-time */
+                lastOpenedAt: string | null;
+                /** Format: date-time */
+                startedAt: string;
+                /** Format: date-time */
+                completedAt: string | null;
+            } | null;
+        };
+        CourseSession: {
+            key: string;
+            order: number;
+            title: string;
+            /** @enum {string|null} */
+            weight: "light" | "medium" | "heavy" | null;
+            deliverable: string | null;
+            entryPath: string;
+            /** @enum {string} */
+            status: "not_started" | "in_progress" | "complete";
+        };
+        CourseDetail: {
+            slug: string;
+            title: string;
+            summary: string;
+            level: string | null;
+            estimatedHours: number | null;
+            tags: string[];
+            accentColor: string | null;
+            coverUrl: string | null;
+            sessionCount: number;
+            version: string;
+            enrollment: {
+                completedSessions: number;
+                totalSessions: number;
+                percent: number;
+                lastSessionKey: string | null;
+                /** Format: date-time */
+                lastOpenedAt: string | null;
+                /** Format: date-time */
+                startedAt: string;
+                /** Format: date-time */
+                completedAt: string | null;
+            } | null;
+            outlineMarkdown: string | null;
+            sessions: {
+                key: string;
+                order: number;
+                title: string;
+                /** @enum {string|null} */
+                weight: "light" | "medium" | "heavy" | null;
+                deliverable: string | null;
+                entryPath: string;
+                /** @enum {string} */
+                status: "not_started" | "in_progress" | "complete";
+            }[];
+        };
+        CourseList: {
+            courses: {
+                slug: string;
+                title: string;
+                summary: string;
+                level: string | null;
+                estimatedHours: number | null;
+                tags: string[];
+                accentColor: string | null;
+                coverUrl: string | null;
+                sessionCount: number;
+                version: string;
+                enrollment: {
+                    completedSessions: number;
+                    totalSessions: number;
+                    percent: number;
+                    lastSessionKey: string | null;
+                    /** Format: date-time */
+                    lastOpenedAt: string | null;
+                    /** Format: date-time */
+                    startedAt: string;
+                    /** Format: date-time */
+                    completedAt: string | null;
+                } | null;
+            }[];
+            nextCursor: string | null;
+        };
+        AdminCourse: {
+            /** Format: uuid */
+            id: string;
+            slug: string;
+            title: string;
+            /** @enum {string} */
+            status: "draft" | "published" | "archived";
+            currentVersion: string | null;
+            versionCount: number;
+            enrollmentCount: number;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        AdminCourseList: {
+            courses: {
+                /** Format: uuid */
+                id: string;
+                slug: string;
+                title: string;
+                /** @enum {string} */
+                status: "draft" | "published" | "archived";
+                currentVersion: string | null;
+                versionCount: number;
+                enrollmentCount: number;
+                /** Format: date-time */
+                createdAt: string;
+                /** Format: date-time */
+                updatedAt: string;
+            }[];
+            nextCursor: string | null;
+        };
+        ValidationResult: {
+            /** @enum {string} */
+            severity: "pass" | "warning" | "error";
+            /** @enum {string} */
+            code: "manifest_valid" | "entries_found" | "archive_safe" | "manifest_missing" | "manifest_invalid" | "entry_missing" | "duplicate_course_id" | "external_script" | "disallowed_extension" | "path_traversal" | "symlink" | "size_exceeded" | "cover_missing" | "checks_skipped";
+            message: string;
+            detail?: string;
+        };
+        IngestResult: {
+            ok: boolean;
+            results: {
+                /** @enum {string} */
+                severity: "pass" | "warning" | "error";
+                /** @enum {string} */
+                code: "manifest_valid" | "entries_found" | "archive_safe" | "manifest_missing" | "manifest_invalid" | "entry_missing" | "duplicate_course_id" | "external_script" | "disallowed_extension" | "path_traversal" | "symlink" | "size_exceeded" | "cover_missing" | "checks_skipped";
+                message: string;
+                detail?: string;
+            }[];
+            course: {
+                /** Format: uuid */
+                id: string;
+                slug: string;
+                title: string;
+                /** @enum {string} */
+                status: "draft" | "published" | "archived";
+                version: string | null;
+                filesStored: number;
+            } | null;
         };
     };
     responses: never;
@@ -347,6 +644,217 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    CourseSpecController_schema: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The manifest schema and the limits that go with it. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CoursesController_list: {
+        parameters: {
+            query?: {
+                limit?: number;
+                /** @description From the previous nextCursor. */
+                cursor?: unknown;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of published courses. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseList"];
+                };
+            };
+        };
+    };
+    CoursesController_detail: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The course. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CourseDetail"];
+                };
+            };
+            /** @description No published course with that slug. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CoursesController_enroll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Enrolled. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProgressSummary"];
+                };
+            };
+            /** @description No published course with that slug. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    CoursesController_unenroll: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No longer enrolled. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminCoursesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A page of courses. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCourseList"];
+                };
+            };
+        };
+    };
+    AdminCoursesController_upload: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Package accepted. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["IngestResult"];
+                };
+            };
+            /** @description No file, or that version already exists. */
+            400: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            /** @description Not an admin. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    AdminCoursesController_update: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @enum {string} */
+                    status?: "draft" | "published" | "archived";
+                    currentVersion?: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The updated course. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminCourse"];
                 };
             };
         };

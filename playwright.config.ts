@@ -9,6 +9,13 @@ export default defineConfig({
   timeout: 60_000,
   expect: { timeout: 15_000 },
   fullyParallel: false,
+  /**
+   * One worker: the suite runs against a real API with a single seeded account, so
+   * enrollment and progress are shared mutable state. Parallel files were racing —
+   * one enrolling while another asserted the empty dashboard. Browser contexts are
+   * isolated; the database is not.
+   */
+  workers: 1,
   reporter: [["list"]],
   use: {
     baseURL: "http://localhost:3100",

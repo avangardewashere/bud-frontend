@@ -60,12 +60,21 @@ test("frame is isolated: opaque origin, no cookie access", async ({ page }) => {
 test("ticks and notes survive a reload of the course", async ({ page }) => {
   await expect(traffic(page)).toContainText("storage.get");
 
-  await course(page).locator("#t1").check({ force: true });
-  await course(page).locator('textarea[data-note="t1"]').fill("Worked on my machine.");
+  const saves = () =>
+    traffic(page).getByRole("listitem").filter({ hasText: "storage.set" }).count();
 
-  // The worksheet debounces its own saves by 400 ms.
-  await expect(traffic(page)).toContainText('storage.set("docker-course:state"');
+  await course(page).locator("#t1").check({ force: true });
+  await expect.poll(saves).toBeGreaterThan(0);
   await expect(keysHeld(page)).toContainText("docker-course:state");
+
+  /**
+   * The worksheet debounces its own saves by 400ms, and the tick has already caused
+   * one. Waiting for a *further* save is what proves the note reached the shell —
+   * reloading on "some save happened" races the note's debounce and loses it.
+   */
+  const afterTick = await saves();
+  await course(page).locator('textarea[data-note="t1"]').fill("Worked on my machine.");
+  await expect.poll(saves).toBeGreaterThan(afterTick);
 
   // Reload only the frame: the spike's store lives in the parent, in memory.
   await page.evaluate(() => {

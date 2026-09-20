@@ -1,25 +1,44 @@
 import type { Metadata } from "next";
 import { Bud } from "@/components/bud";
+import { CourseCard } from "@/components/course/CourseCard";
+import { budApi } from "@/lib/api";
+import { serverAuth } from "@/lib/api/session";
 
 export const metadata: Metadata = { title: "Catalog — Bud" };
 
 /**
- * Placeholder, so the dashboard's "Browse the catalog" is not a dead link.
+ * The catalog — mockup 1e.
  *
- * Block 6 replaces this wholesale with mockup 1e once GET /courses exists.
+ * The filter pills in the mockup are left out for now: with one published course
+ * they would be decoration, and doing them properly means deciding whether filtering
+ * is a query parameter the API handles or client-side. That decision belongs with
+ * the second course.
  */
-export default function CatalogPage() {
+export default async function CatalogPage() {
+  const { courses } = await budApi.listCourses(await serverAuth());
+
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
       <h1 className="text-4xl">Catalog</h1>
-      <p className="mt-2 text-[var(--muted-foreground)]">No courses published yet.</p>
+      <p className="mt-2 text-[var(--muted-foreground)]">
+        {courses.length === 1 ? "1 course published" : `${courses.length} courses published`}
+      </p>
 
-      <section className="mt-10 rounded-[var(--radius-panel)] border border-dashed border-[var(--border)] px-6 py-16 text-center">
-        <Bud pose="seed" size={96} label={null} className="mx-auto" />
-        <p className="mt-6 text-[var(--muted-foreground)]">
-          Courses appear here once the catalog endpoint lands and an admin uploads one.
-        </p>
-      </section>
+      <div className="mt-8 grid gap-6 sm:grid-cols-2">
+        {courses.map((course) => (
+          <CourseCard key={course.slug} course={course} />
+        ))}
+
+        {/* The mockup's dashed slot: "Only one course so far." */}
+        <div className="flex flex-col items-center justify-center rounded-[var(--radius-card)] border border-dashed border-[var(--border)] p-10 text-center">
+          <Bud pose="seed" size={84} label={null} />
+          <p className="mt-4 text-sm text-[var(--muted-foreground)]">
+            {courses.length === 0
+              ? "No courses published yet."
+              : "That's everything so far. Admins can upload a course."}
+          </p>
+        </div>
+      </div>
     </main>
   );
 }

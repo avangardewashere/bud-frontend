@@ -1,5 +1,13 @@
 import { cookies } from "next/headers";
-import { budApi, type PublicUser } from "./client";
+import { budApi, type PublicUser, type RequestOptions } from "./client";
+
+/**
+ * Forwards the incoming request's cookies to the API, so server components can call
+ * it as the signed-in user: `budApi.listCourses(await serverAuth())`.
+ */
+export async function serverAuth(): Promise<RequestOptions> {
+  return { headers: { cookie: (await cookies()).toString() } };
+}
 
 /**
  * Server-side session lookup, for layouts and server components.

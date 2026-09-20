@@ -24,6 +24,11 @@ import type { components, operations } from "./schema";
 
 export type PublicUser = components["schemas"]["PublicUser"];
 export type UserEnvelope = components["schemas"]["UserEnvelope"];
+export type CourseSummary = components["schemas"]["CourseSummary"];
+export type CourseDetail = components["schemas"]["CourseDetail"];
+export type CourseSession = components["schemas"]["CourseSession"];
+export type CourseList = components["schemas"]["CourseList"];
+export type ProgressSummary = components["schemas"]["ProgressSummary"];
 
 type JsonBody<O extends keyof operations> = operations[O] extends {
   requestBody: { content: { "application/json": infer B } };
@@ -145,6 +150,39 @@ export const budApi = {
   async me(options?: RequestOptions): Promise<PublicUser> {
     const result = await request<UserEnvelope>("GET", "/me", undefined, options);
     return result.user;
+  },
+
+  /** Published courses, with this user's enrollment folded in where there is one. */
+  async listCourses(options?: RequestOptions): Promise<CourseList> {
+    return request<CourseList>("GET", "/courses", undefined, options);
+  },
+
+  /** One course, plus its outline Markdown and its sessions with per-session status. */
+  async getCourse(slug: string, options?: RequestOptions): Promise<CourseDetail> {
+    return request<CourseDetail>(
+      "GET",
+      `/courses/${encodeURIComponent(slug)}`,
+      undefined,
+      options,
+    );
+  },
+
+  async enroll(slug: string, options?: RequestOptions): Promise<void> {
+    await request<void>(
+      "POST",
+      `/courses/${encodeURIComponent(slug)}/enroll`,
+      undefined,
+      options,
+    );
+  },
+
+  async unenroll(slug: string, options?: RequestOptions): Promise<void> {
+    await request<void>(
+      "DELETE",
+      `/courses/${encodeURIComponent(slug)}/enroll`,
+      undefined,
+      options,
+    );
   },
 
   /** `me()` with 401 turned into null, for code that only asks "is anyone signed in?". */

@@ -52,9 +52,9 @@ test("signing in lands on the dashboard, greeted by name", async ({ page }) => {
     `Welcome back, ${ADMIN.firstName}.`,
   );
 
-  // Nothing is enrolled yet, so the dashboard is the seed empty state (mockup 1j).
-  await expect(page.getByRole("heading", { name: "Nothing planted yet." })).toBeVisible();
-  await expect(page.getByRole("link", { name: "Browse the catalog" })).toBeVisible();
+  // Deliberately says nothing about enrollment: catalog.spec owns that state, and
+  // asserting it here would make this test depend on another file's leftovers.
+  await expect(page.getByRole("banner")).toBeVisible();
 });
 
 test("the nav shows Admin to an admin, and marks the current section", async ({ page }) => {
