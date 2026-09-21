@@ -11,17 +11,29 @@ import { BudApiError, BudApiUnreachableError, budApi } from "@/lib/api";
  * user, course and session. The course never sends a course id: it cannot be trusted
  * to, and it does not need to, because the shell knows what it mounted.
  *
- * Everything here was learned from the M1 spike and is load-bearing:
+ * ── Replies go over a MessagePort, not to the frame's window ──
  *
- *   - The listener is attached before the frame's src is set. Server-rendered, the
- *     frame would otherwise start loading before hydration and its first storage.get
- *     would arrive with nobody listening — the course then starts from a blank sheet
- *     and the learner silently loses their work.
- *   - Identity is `event.source`, not `event.origin`. Sandboxed without
- *     allow-same-origin the frame has an opaque origin, so origin arrives as "null"
- *     and cannot be named as a targetOrigin when replying.
- *   - Replies go to that one window handle with "*", the single documented exception
- *     to the never-"*" rule in Tech-Information §11.
+ * Posting replies to the frame's window handle leaked. A WindowProxy follows the
+ * browsing context across navigation rather than pointing at a document, so a course
+ * could call storage.get, navigate its own frame to a page it controlled, and receive
+ * the reply there — handing a learner's saved work to an attacker-chosen document and
+ * defeating the courses origin's connect-src 'none' by using our own reply as the
+ * channel. Verified in Chromium; Planning/bridge-reply-probe.mjs reproduces it.
+ *
+ * Re-checking the handle before replying does NOT fix it. The comparison is not a
+ * dependable signal — the probe leaks even in the run that reports the handles as
+ * different. A port fixes it structurally: a MessagePort belongs to the document that
+ * received it, so after a navigation the new document has nothing to receive on.
+ *
+ * The handshake that transfers the port carries no data, so "*" on that one message is
+ * harmless. It is honoured once per mounted document: bridge.js says hello while the
+ * course is still parsing, so the first hello is always the page we mounted.
+ *
+ * Other invariants, from the M1 spike:
+ *   - The listener is attached before the frame's src is set. Otherwise the frame
+ *     starts loading before hydration, its first storage.get arrives with nobody
+ *     listening, and the course silently starts from a blank sheet.
+ *   - The frame is sandboxed without allow-same-origin, so its origin is opaque.
  */
 
 /** Long enough for a slow course, short enough that a hung load is not a mystery. */
@@ -57,9 +69,8 @@ export function useCourseBridge({
   const [save, setSave] = useState<SaveState>({ status: "idle" });
 
   /**
-   * Both of these are tracked *by src* rather than as bare booleans, so moving to
-   * another session resets them without an effect having to write state during
-   * render — `loaded` for the previous session must not count for the next one.
+   * Tracked by src rather than as bare booleans, so moving to another session
+   * resets them without an effect writing state during render.
    */
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const [slowSrc, setSlowSrc] = useState<string | null>(null);
@@ -74,7 +85,11 @@ export function useCourseBridge({
 
   const describe = useCallback((error: unknown): SaveError => {
     if (error instanceof BudApiUnreachableError) {
-      return { status: "error", message: "Can't reach Bud. Your work is in this tab only.", permanent: false };
+      return {
+        status: "error",
+        message: "Can't reach Bud. Your work is in this tab only.",
+        permanent: false,
+      };
     }
     if (error instanceof BudApiError) {
       if (error.code === "not_enrolled") {
@@ -95,89 +110,99 @@ export function useCourseBridge({
   }, []);
 
   useEffect(() => {
-    function reply(source: Window, id: number, result: unknown) {
-      // "*" is unavoidable: an opaque origin cannot be named. Safe because this
-      // goes to one verified window handle, not a broadcast.
-      source.postMessage({ v: 1, id, result }, "*");
-    }
+    let port: MessagePort | null = null;
 
-    function replyError(source: Window, id: number, code: string, message: string) {
-      source.postMessage({ v: 1, id, error: { code, message } }, "*");
-    }
+    async function handle(msg: Request) {
+      const reply = (result: unknown) => port?.postMessage({ v: 1, id: msg.id, result });
+      const replyError = (code: string, message: string) =>
+        port?.postMessage({ v: 1, id: msg.id, error: { code, message } });
 
-    async function onMessage(event: MessageEvent) {
-      const frame = frameRef.current;
-      if (!frame || event.source !== frame.contentWindow) return;
-
-      const msg = event.data as Request | undefined;
-      if (!msg || msg.v !== 1 || typeof msg.id !== "number") return;
-
-      const source = event.source as Window;
       const params = (msg.params ?? {}) as { key?: string; value?: string; fraction?: number };
       const { slug: courseSlug, sessionKey: key, onProgressChanged: changed } = ctx.current;
 
       try {
         switch (msg.method) {
-          case "storage.get": {
-            const result = await budApi.getState(courseSlug, String(params.key));
-            reply(source, msg.id, result);
+          case "storage.get":
+            reply(await budApi.getState(courseSlug, String(params.key)));
             return;
-          }
-          case "storage.set": {
+          case "storage.set":
             setSave({ status: "saving" });
             await budApi.putState(courseSlug, String(params.key), String(params.value));
             setSave({ status: "saved" });
-            reply(source, msg.id, { ok: true });
+            reply({ ok: true });
             return;
-          }
-          case "storage.delete": {
+          case "storage.delete":
             setSave({ status: "saving" });
             await budApi.deleteState(courseSlug, String(params.key));
             setSave({ status: "saved" });
-            reply(source, msg.id, { ok: true });
+            reply({ ok: true });
             return;
-          }
-          case "bud.complete": {
+          case "bud.complete":
             // The course suggests; the shell records. Its own state blob is untouched.
             await budApi.completeSession(courseSlug, key);
             changed?.();
-            reply(source, msg.id, { ok: true });
+            reply({ ok: true });
             return;
-          }
-          case "bud.progress": {
+          case "bud.progress":
             await budApi.reportProgress(courseSlug, key, Number(params.fraction));
             changed?.();
-            reply(source, msg.id, { ok: true });
+            reply({ ok: true });
             return;
-          }
-          case "bud.ready": {
+          case "bud.ready":
             setLoadedSrc(src);
-            reply(source, msg.id, { ok: true });
+            reply({ ok: true });
             return;
-          }
-          case "bud.height": {
+          case "bud.height":
             // Defined in the contract, unused here: the worksheets are full pages
             // with their own scroll, so the frame owns scrolling.
-            reply(source, msg.id, { ok: true });
+            reply({ ok: true });
             return;
-          }
           default:
-            replyError(source, msg.id, "unknown_method", msg.method);
+            replyError("unknown_method", msg.method);
         }
       } catch (error) {
         const state = describe(error);
         setSave(state);
-        replyError(source, msg.id, "bud_error", state.message);
+        replyError("bud_error", state.message);
       }
     }
 
-    window.addEventListener("message", onMessage);
+    function onHello(event: MessageEvent) {
+      const frame = frameRef.current;
+      if (!frame || event.source !== frame.contentWindow) return;
+      if (port) return; // one channel per mounted document
+
+      const msg = event.data as { v?: number; hello?: boolean } | undefined;
+      if (!msg || msg.v !== 1 || msg.hello !== true) return;
+
+      const channel = new MessageChannel();
+      port = channel.port1;
+      port.onmessage = (e) => {
+        const request = e.data as Request | undefined;
+        if (!request || request.v !== 1 || typeof request.id !== "number") return;
+        void handle(request);
+      };
+      port.start();
+
+      /**
+       * "*" is unavoidable — the frame's origin is opaque and cannot be named — but
+       * this message carries only the port. Everything worth stealing travels on the
+       * port afterwards, and only the document holding it can receive that.
+       */
+      frame.contentWindow.postMessage({ v: 1, type: "bud.channel" }, "*", [channel.port2]);
+    }
+
+    window.addEventListener("message", onHello);
 
     // Only now is it safe to load the course.
     const frame = frameRef.current;
     if (frame && frame.getAttribute("src") !== src) frame.setAttribute("src", src);
 
-    return () => window.removeEventListener("message", onMessage);
+    return () => {
+      window.removeEventListener("message", onHello);
+      port?.close();
+      port = null;
+    };
   }, [src, describe]);
 
   /**

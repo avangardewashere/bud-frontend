@@ -10,16 +10,23 @@
  * The course never sees a user id, a course id, or a cookie. The shell knows
  * which course is mounted and scopes every call to the signed-in user.
  *
- * Origin handling, which is the subtle part:
+ * ── Why a MessageChannel rather than postMessage to window.parent ──
  *
- *   The iframe is sandboxed WITHOUT allow-same-origin, so this document has an
- *   opaque origin. That means the shell cannot name our origin when it replies
- *   and must post to our window handle with "*" instead — it verifies
- *   event.source to compensate.
+ * Replies used to be posted back to the frame's window handle. That handle is a
+ * WindowProxy, which follows the browsing context across navigation rather than
+ * pointing at a document — so a course could call storage.get, navigate its own
+ * frame to a page it controlled, and receive the shell's reply there. The
+ * learner's saved work would land on an attacker-chosen document, defeating the
+ * courses origin's connect-src 'none' by using the shell's own reply as the
+ * channel. Verified in Chromium; see Planning/bridge-reply-probe.mjs.
  *
- *   Our side has no such problem: the shell's origin is knowable, because this
- *   script is served from it. We read it off our own <script src> and use it as
- *   an explicit targetOrigin for everything we send. Never "*".
+ * Checking the handle before replying does not fix it: the comparison is not a
+ * dependable signal, and the probe leaks even in the run where it reports the
+ * handles as different.
+ *
+ * A port does fix it, structurally rather than by timing. A MessagePort belongs
+ * to the document that received it. After a navigation the new document never
+ * had one, so there is nothing to deliver to and nothing to check.
  */
 (function () {
   "use strict";
@@ -36,13 +43,32 @@
   var TIMEOUT_MS = 10000;
   var seq = 0;
   var pending = Object.create(null);
+  var port = null;
+  var queued = [];
 
   window.addEventListener("message", function (event) {
-    // Replies arrive with targetOrigin "*" (we are opaque), so the origin
-    // string is our only check that this came from the shell.
+    // The handshake is the only thing that arrives on the window; everything
+    // else travels over the port.
     if (event.origin !== APP_ORIGIN) return;
     if (event.source !== window.parent) return;
 
+    var msg = event.data;
+    if (!msg || msg.v !== 1 || msg.type !== "bud.channel") return;
+
+    // One port per mounted document, ever. A second handshake is either a bug
+    // or an attempt to replace the channel, and neither should be honoured.
+    if (port) return;
+    if (!event.ports || !event.ports[0]) return;
+
+    port = event.ports[0];
+    port.onmessage = onReply;
+    port.start();
+
+    for (var i = 0; i < queued.length; i += 1) port.postMessage(queued[i]);
+    queued = [];
+  });
+
+  function onReply(event) {
     var msg = event.data;
     if (!msg || msg.v !== 1 || typeof msg.id !== "number") return;
 
@@ -56,7 +82,7 @@
     } else {
       entry.resolve(msg.result);
     }
-  });
+  }
 
   function call(method, params) {
     return new Promise(function (resolve, reject) {
@@ -72,7 +98,12 @@
       }, TIMEOUT_MS);
 
       pending[id] = { resolve: resolve, reject: reject, timer: timer };
-      window.parent.postMessage({ v: 1, id: id, method: method, params: params }, APP_ORIGIN);
+
+      var envelope = { v: 1, id: id, method: method, params: params };
+      // Calls made before the port arrives are held rather than dropped: the
+      // worksheets ask for their state the moment they parse.
+      if (port) port.postMessage(envelope);
+      else queued.push(envelope);
     });
   }
 
@@ -108,4 +139,8 @@
       return call("bud.height", { px: Number(px) });
     },
   };
+
+  // Ask for the channel. This runs while the original course document is
+  // parsing, so the first hello always comes from the page the shell mounted.
+  window.parent.postMessage({ v: 1, hello: true }, APP_ORIGIN);
 })();
