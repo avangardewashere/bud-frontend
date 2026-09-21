@@ -45,8 +45,14 @@ test("a wrong password says so, in Bud's voice", async ({ page }) => {
   await expect(page).toHaveURL(/\/login$/);
 });
 
-test("signing in lands on the dashboard, greeted by name", async ({ page }) => {
+test("signing in lands on the dashboard, greeted by name", async ({ page, context }) => {
   await signIn(page);
+
+  // The session is an httpOnly cookie owned by the API: script on any page —
+  // including a course's — must not be able to read it.
+  const session = (await context.cookies()).find((c) => c.name === "bud_session");
+  expect(session, "the API should have set bud_session").toBeTruthy();
+  expect(session?.httpOnly, "the session cookie must be httpOnly").toBe(true);
 
   await expect(page.getByRole("heading", { level: 1 })).toHaveText(
     `Welcome back, ${ADMIN.firstName}.`,

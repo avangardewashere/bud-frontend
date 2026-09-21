@@ -1,0 +1,29 @@
+# Keep the build context small and the image clean. Anything listed here is not
+# sent to the daemon at all, which is most of why the build is quick.
+
+node_modules
+.next
+.git
+.github
+
+# Test output and the Playwright browsers, which are large and useless in an image.
+test-results
+playwright-report
+blob-report
+
+# Local state and secrets. .env.example is deliberately not ignored, but no .env
+# should ever reach an image — configuration arrives at runtime.
+.env
+.env.*
+!.env.example
+.bud-dev
+
+# Course fixtures are served by the dev courses server from local disk. In
+# production the courses origin reads them from object storage, so they are not
+# part of the shell's image.
+courses
+tools
+
+README.md
+Dockerfile
+.dockerignore

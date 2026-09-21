@@ -22,12 +22,27 @@ They must stay on **different hosts**, not just different ports: cookies ignore 
 
 Auth needs a third process, the API from the sibling `Bud - backend` project, on **http://localhost:3102** (`npm run start:dev` there, with its Postgres container up). Its CORS allows `http://localhost:3100` and nothing else — reaching the shell on `127.0.0.1:3100` is a different host, so the preflight fails and the cookie would not match anyway.
 
-Three pages worth opening:
+**http://localhost:3100/brand** is the brand gallery: every piece of artwork at every size the screens use — Bud's three poses, the mark and wordmark, the growth meter across course lengths, and the fallback course cover. It is kept as a living styleguide and is the target for `e2e/brand.spec.ts`.
 
-- **http://localhost:3100/dev/auth** — the auth harness. Signs in with the typed client against the real API and shows what `/me` returns. Throwaway: block 5 replaces it with the designed login screen.
+The two throwaway harnesses that came before the real screens — `/spike` for the bridge and `/dev/auth` for the typed client — are gone. The player and the login screen now cover both against the real API.
 
-- **http://localhost:3100/brand** — the brand gallery. Every piece of artwork at every size the screens use: Bud's three poses, the mark and wordmark, the growth meter across course lengths, and the fallback course cover. Kept as a living styleguide and used as the target for `e2e/brand.spec.ts`.
-- **http://localhost:3100/spike** — the bridge spike. Session 1 of the Docker course, unmodified, persisting through the bridge into an in-memory store.
+## Container
+
+```bash
+docker build -t bud-web .
+docker run --rm -p 3100:3100 bud-web
+```
+
+`NEXT_PUBLIC_*` values are inlined into the client bundle at build time, so they are build arguments rather than runtime environment — an image built for one environment cannot be re-pointed at another by changing env vars. Build a new image instead:
+
+```bash
+docker build -t bud-web \
+  --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.example \
+  --build-arg NEXT_PUBLIC_COURSES_ORIGIN=https://courses.example \
+  --build-arg NEXT_PUBLIC_APP_ORIGIN=https://app.example .
+```
+
+The runtime stage carries Next's `standalone` output rather than `node_modules`, runs as the non-root `node` user, and serves with `node server.js` — `next` itself is not installed in that stage.
 
 ## Checks
 

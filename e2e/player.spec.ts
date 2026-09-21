@@ -62,6 +62,15 @@ test("the player mounts the course in an isolated frame", async ({ page }) => {
       }
     }),
   ).toBe("blocked");
+
+  // bridge.js injected, exposing exactly contract v1 (Overall Plan §3) — including
+  // storage.delete, which the original contract omitted and every worksheet calls.
+  const api = await courseFrame!.evaluate(() => ({
+    storage: Object.keys((window as unknown as { storage: object }).storage).sort(),
+    bud: Object.keys((window as unknown as { bud: object }).bud).sort(),
+  }));
+  expect(api.storage).toEqual(["delete", "get", "set"]);
+  expect(api.bud).toEqual(["complete", "height", "progress", "ready"]);
 });
 
 test("the rail shows every session and marks the current one", async ({ page }) => {
