@@ -44,6 +44,8 @@ test("a learner can arrive, start the Docker course and finish a session", async
   await page.getByRole("button", { name: "Start this course" }).click();
   await page.getByRole("link", { name: /Session 1/ }).click();
   await expect(page).toHaveURL(new RegExp(`/learn/${SLUG}/s1$`));
+  // The worksheet's listeners are attached by a script at the end of its document.
+  await expect(page.getByText("Opening the session…")).toBeHidden();
 
   // Do some work. uncheck-then-check guarantees a change event whatever the
   // starting state; check() alone on a ticked box saves nothing.

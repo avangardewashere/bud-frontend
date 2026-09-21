@@ -1,5 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
-import { LEARNER, signIn, skipWithoutApi } from "./support/api";
+import { LEARNER, openSession, signIn, skipWithoutApi } from "./support/api";
 
 /**
  * Block 7 — the course player, and with it the Phase 1 exit criterion from
@@ -28,7 +28,7 @@ async function enrol(page: Page) {
 
 /** Leaves the learner enrolled but with session 1 not complete. */
 async function resetSession1(page: Page) {
-  await page.goto(`/learn/${SLUG}/${SESSION_1}`);
+  await openSession(page, SLUG, SESSION_1);
   const undo = page.getByRole("button", { name: "Mark not complete" });
   if (await undo.isVisible().catch(() => false)) await undo.click();
   await expect(page.getByRole("button", { name: "Mark complete" })).toBeVisible();
@@ -42,7 +42,7 @@ test.beforeEach(async ({ page }) => {
 });
 
 test("the player mounts the course in an isolated frame", async ({ page }) => {
-  await page.goto(`/learn/${SLUG}/${SESSION_1}`);
+  await openSession(page, SLUG, SESSION_1);
 
   await expect(frame(page).locator("#t1")).toBeVisible();
 
@@ -74,7 +74,7 @@ test("the player mounts the course in an isolated frame", async ({ page }) => {
 });
 
 test("the rail shows every session and marks the current one", async ({ page }) => {
-  await page.goto(`/learn/${SLUG}/${SESSION_1}`);
+  await openSession(page, SLUG, SESSION_1);
 
   const rail = page.getByRole("navigation");
   await expect(rail.getByRole("listitem")).toHaveCount(10);
@@ -90,7 +90,7 @@ test("the rail shows every session and marks the current one", async ({ page }) 
 /** The exit criterion, in one test. */
 test("work done in the course survives a reload and a fresh sign-in", async ({ page }) => {
   await resetSession1(page);
-  await page.goto(`/learn/${SLUG}/${SESSION_1}`);
+  await openSession(page, SLUG, SESSION_1);
 
   const saved = page.getByRole("status").filter({ hasText: "Saved" });
   const tick = frame(page).locator("#t1");
@@ -127,7 +127,7 @@ test("work done in the course survives a reload and a fresh sign-in", async ({ p
   await expect(page).toHaveURL(/\/login$/);
 
   await signIn(page, LEARNER);
-  await page.goto(`/learn/${SLUG}/${SESSION_1}`);
+  await openSession(page, SLUG, SESSION_1);
 
   await expect(frame(page).locator("#t1")).toBeChecked();
   await expect(note).toHaveValue(written);
@@ -137,7 +137,7 @@ test("work done in the course survives a reload and a fresh sign-in", async ({ p
 test("completing a session moves the dashboard and the meter", async ({ page }) => {
   await resetSession1(page);
 
-  await page.goto(`/learn/${SLUG}/${SESSION_1}`);
+  await openSession(page, SLUG, SESSION_1);
   await page.getByRole("button", { name: "Mark complete" }).click();
   await expect(page.getByRole("button", { name: "Mark not complete" })).toBeVisible();
 
@@ -154,7 +154,7 @@ test("completing a session moves the dashboard and the meter", async ({ page }) 
 });
 
 test("Clear saved work deletes the state through the bridge", async ({ page }) => {
-  await page.goto(`/learn/${SLUG}/${SESSION_1}`);
+  await openSession(page, SLUG, SESSION_1);
 
   const tick = frame(page).locator("#t1");
   await tick.uncheck({ force: true });

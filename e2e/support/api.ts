@@ -1,4 +1,4 @@
-import { test, type Page } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 /**
  * Shared helpers for the specs that need the real API.
@@ -53,6 +53,21 @@ export async function skipWithoutApi(page: Page) {
     !(await apiReachable(page)),
     `Bud API not reachable at ${API} — start it with "npm run start:dev" in "Bud - backend".`,
   );
+}
+
+/**
+ * Opens a session and waits for the course to be interactive.
+ *
+ * The wait is not optional. A worksheet's checkboxes exist the moment the HTML
+ * parses, but the script that attaches their change listeners runs at the end of the
+ * document — so ticking in between toggles the box with nobody listening, nothing is
+ * saved, and the test fails as though the bridge were broken. The player's own
+ * loading overlay clears on the frame's load event, which is after scripts have run.
+ */
+export async function openSession(page: Page, slug: string, sessionKey: string) {
+  await page.goto(`/learn/${slug}/${sessionKey}`);
+  await expect(page.getByText("Opening the session…")).toBeHidden();
+  await expect(page.frameLocator('iframe[title*="Docker"]').locator("#t1")).toBeVisible();
 }
 
 /** Signs in through the real login screen and waits for the dashboard. */
