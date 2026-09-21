@@ -51,6 +51,8 @@ test.beforeEach(async ({ page }) => {
 // Control: the course must be loaded and interactive, or these prove nothing.
 const openPlayer = (page: Page) => openSession(page, SLUG, "s1");
 
+const nonceOf = (csp: string) => /'nonce-([^']+)'/.exec(csp)?.[1] ?? null;
+
 test("the shell sends a CSP naming the courses origin", async ({ page }) => {
   const response = await page.goto("/login");
   const csp = response?.headers()["content-security-policy"] ?? "";
@@ -59,6 +61,75 @@ test("the shell sends a CSP naming the courses origin", async ({ page }) => {
   expect(csp).toContain(process.env.NEXT_PUBLIC_COURSES_ORIGIN ?? "127.0.0.1:3101");
   // Bud is not embeddable by anyone.
   expect(csp).toContain("frame-ancestors 'none'");
+});
+
+test("scripts are locked to a fresh per-request nonce", async ({ page }) => {
+  const first = (await page.goto("/login"))?.headers()["content-security-policy"] ?? "";
+  const response = await page.goto("/login");
+  const second = response?.headers()["content-security-policy"] ?? "";
+
+  expect(first).toMatch(/script-src [^;]*'nonce-[^']+'/);
+  // strict-dynamic: host allowlists are ignored, so even an injected <script src>
+  // on our own origin is refused unless a nonced script loaded it.
+  expect(first).toContain("'strict-dynamic'");
+
+  // A nonce that repeats is a nonce an attacker can learn and reuse.
+  expect(nonceOf(first)).not.toBeNull();
+  expect(nonceOf(first)).not.toEqual(nonceOf(second));
+
+  /**
+   * Next really did stamp *this request's* nonce onto every script it rendered —
+   * otherwise the policy would be refusing the app's own code. This reads the HTML
+   * as served rather than the live DOM, deliberately: scripts inserted at runtime by
+   * an already-nonced script (chunk loading, and the dev HMR client) carry no nonce
+   * of their own and don't need one — trusting exactly those is what 'strict-dynamic'
+   * is for. A script carrying a *different* nonce would mean a page served from a
+   * cache with a stale one, and is the failure this is really looking for.
+   */
+  const nonce = nonceOf(second)!;
+  const tags = (await response!.text()).match(/<script\b[^>]*>/g) ?? [];
+  expect(tags.length).toBeGreaterThan(0);
+  expect(tags.filter((t) => !t.includes(`nonce="${nonce}"`))).toEqual([]);
+});
+
+/**
+ * The test that matters most. A policy that silently blocks part of the app is worse
+ * than no policy — the page looks fine and a feature quietly stops working. Every
+ * screen is visited and every violation the browser raises is collected.
+ */
+test("no page in the app violates its own policy", async ({ page }) => {
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    (window as unknown as { __cspViolations: string[] }).__cspViolations = seen;
+    document.addEventListener("securitypolicyviolation", (e) => {
+      seen.push(`${e.violatedDirective} ← ${e.blockedURI || "(inline)"} @ ${location.pathname}`);
+    });
+  });
+
+  const violations: string[] = [];
+  const visit = async (path: string) => {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle").catch(() => {});
+    violations.push(
+      ...(await page.evaluate(
+        () => (window as unknown as { __cspViolations?: string[] }).__cspViolations ?? [],
+      )),
+    );
+  };
+
+  // The learner's journey — beforeEach has already signed in and enrolled.
+  await visit("/dashboard");
+  await visit("/catalog");
+  await visit(`/courses/${SLUG}`);
+  await openSession(page, SLUG, "s1");
+  violations.push(
+    ...(await page.evaluate(
+      () => (window as unknown as { __cspViolations?: string[] }).__cspViolations ?? [],
+    )),
+  );
+  await visit("/brand");
+
+  expect(violations, violations.join("\n")).toEqual([]);
 });
 
 test("a course cannot navigate its own frame off the courses origin", async ({ page }) => {

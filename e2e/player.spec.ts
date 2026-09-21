@@ -107,10 +107,21 @@ test("work done in the course survives a reload and a fresh sign-in", async ({ p
   await tick.check({ force: true });
   await expect(saved).toBeVisible();
 
+  /**
+   * Wait for the write that carries the note, not for the indicator. "Saved" is
+   * already showing from the checkbox a moment ago, so waiting for it returns at
+   * once — and the reload below then beats the note's 400ms debounce and the note is
+   * lost. This used to claim the indicator proved the note arrived; it proved
+   * nothing, and the faster production server exposed it.
+   */
+  const noteSaved = page.waitForResponse(
+    (r) =>
+      r.request().method() === "PUT" &&
+      r.url().includes("/state/") &&
+      (r.request().postData() ?? "").includes(written),
+  );
   await note.fill(written);
-  // The worksheet debounces at 400ms; waiting for the indicator to settle again is
-  // what proves the note itself reached the API rather than just the checkbox.
-  await expect(saved).toBeVisible();
+  expect((await noteSaved).ok(), "the note's write should succeed").toBe(true);
 
   // 1. A full reload: nothing in memory survives this.
   await page.reload();

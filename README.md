@@ -64,13 +64,35 @@ npm run api:types
 
 The backend publishes the spec at `http://localhost:3102/docs/openapi.json` (Swagger UI at `/docs`) and is the single source of truth for it — the frontend never hand-writes a request or response shape. Everything else in `src/lib/api/` is a thin layer over that: `credentials: "include"` on every call, since the session is an httpOnly cookie, and non-2xx responses turned into a `BudApiError` carrying the API's error envelope.
 
+## Security
+
+Course HTML is author-controlled JavaScript, so most of what keeps a learner's work safe is about what a course *cannot* do. Each rule below was found by trying to break it, and each has a test.
+
+| Rule | Where | Why |
+|---|---|---|
+| Courses run on a different **host**, sandboxed without `allow-same-origin` | player iframe | Cookies ignore ports; an opaque origin cannot read the shell's cookies, storage or DOM |
+| Bridge replies travel over a **MessagePort**, never to the frame's window | `public/bridge.js`, `useCourseBridge` | A `WindowProxy` follows the frame across navigation, so a reply to the window could land on a page the course navigated to. Re-checking the handle does not help |
+| **No `allow-popups`** | player iframe | A popup is an unpoliced way out: the learner's data rides in a `window.open` URL, or the course hands the bridge port to the popup |
+| **`frame-src`** names only the courses origin | `src/lib/security/csp.ts` | A course can navigate its own frame to `https://evil/?d=…`. Nothing the courses origin sends can stop that; only the embedder's `frame-src` can |
+| **`script-src` with a per-request nonce** and `'strict-dynamic'` | `src/proxy.ts` | No inline or injected script runs unless Next rendered it for this request |
+
+The CSP is built per request in `src/proxy.ts` from `src/lib/security/csp.ts`, which is where to read the reasoning for each directive. Two consequences worth knowing:
+
+- **Every page renders per request** — the root layout opts in, because Next can only stamp a nonce while rendering against a live request. Nothing is prerendered, `/brand` included.
+- **`style-src` is split.** Components use React `style={…}` props, which render as `style` attributes that a nonce cannot cover, and once a directive holds a nonce browsers ignore `'unsafe-inline'` in it. So `<style>` elements are nonced (`style-src-elem`) and attributes are allowed (`style-src-attr`).
+
+`node tools/bridge-leak-probe.mjs` runs the real `bridge.js` on two real origins and fails if a learner's data can reach a document the course chose. `e2e/security.spec.ts` checks the shell's policy, including that no page in the app violates it.
+
 ## Layout
 
 ```
 courses/docker-fundamentals/1.0.0/   the Docker course package + bud.manifest.json
 public/bridge.js                     injected into every course HTML entry
 tools/courses-server.mjs             the courses origin, for development
-src/app/                             routes (src/app/api/ will be the stub API)
+tools/bridge-leak-probe.mjs          guards the bridge against the exfiltration routes above
+src/proxy.ts                         the per-request nonce and CSP
+src/lib/security/csp.ts              the policy itself, and why each directive is there
+src/app/                             routes
 e2e/                                 Playwright
 ```
 
