@@ -168,8 +168,8 @@ export function useCourseBridge({
     }
 
     function onHello(event: MessageEvent) {
-      const frame = frameRef.current;
-      if (!frame || event.source !== frame.contentWindow) return;
+      const target = frameRef.current?.contentWindow;
+      if (!target || event.source !== target) return;
       if (port) return; // one channel per mounted document
 
       const msg = event.data as { v?: number; hello?: boolean } | undefined;
@@ -189,7 +189,7 @@ export function useCourseBridge({
        * this message carries only the port. Everything worth stealing travels on the
        * port afterwards, and only the document holding it can receive that.
        */
-      frame.contentWindow.postMessage({ v: 1, type: "bud.channel" }, "*", [channel.port2]);
+      target.postMessage({ v: 1, type: "bud.channel" }, "*", [channel.port2]);
     }
 
     window.addEventListener("message", onHello);
