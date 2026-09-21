@@ -4,6 +4,26 @@
  */
 
 export interface paths {
+    "/auth/providers": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Which sign-in options this deployment offers
+         * @description So the shell can decide whether to render a GitHub button and a register link, rather than showing controls that lead to a 404.
+         */
+        get: operations["AuthController_providers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/register": {
         parameters: {
             query?: never;
@@ -72,6 +92,26 @@ export interface paths {
          * @description Signs out every other session for this account.
          */
         post: operations["AuthController_changePassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/auth/github": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Start signing in with GitHub
+         * @description A redirect, not a fetch: navigate the browser here. Returns 404 when GITHUB_CLIENT_ID and GITHUB_CLIENT_SECRET are not configured.
+         */
+        get: operations["GithubOAuthController_start"];
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;
@@ -423,6 +463,12 @@ export interface components {
         ChangePasswordResult: {
             revokedSessions: number;
         };
+        AuthProviders: {
+            password: boolean;
+            github: boolean;
+            /** @enum {string} */
+            signupMode: "invite_only" | "open" | "closed";
+        };
         ErrorResponse: {
             statusCode: number;
             error: string;
@@ -684,6 +730,26 @@ export interface components {
 }
 export type $defs = Record<string, never>;
 export interface operations {
+    AuthController_providers: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Available providers. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AuthProviders"];
+                };
+            };
+        };
+    };
     AuthController_register: {
         parameters: {
             query?: never;
@@ -829,6 +895,23 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
+            };
+        };
+    };
+    GithubOAuthController_start: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };
@@ -1385,7 +1468,7 @@ export interface operations {
                 };
                 content?: never;
             };
-            /** @description A dependency is unavailable. */
+            /** @description A required dependency is unavailable. */
             503: {
                 headers: {
                     [name: string]: unknown;

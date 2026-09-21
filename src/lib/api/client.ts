@@ -33,6 +33,26 @@ export type Dashboard = components["schemas"]["Dashboard"];
 export type StateValue = components["schemas"]["StateValue"];
 export type SessionProgress = components["schemas"]["SessionProgress"];
 export type SessionProgressList = components["schemas"]["SessionProgressList"];
+export type AdminCourse = components["schemas"]["AdminCourse"];
+export type AdminCourseList = components["schemas"]["AdminCourseList"];
+export type IngestResult = components["schemas"]["IngestResult"];
+export type ValidationResult = components["schemas"]["ValidationResult"];
+export type CourseStorageKeys = components["schemas"]["CourseStorageKeys"];
+export type CourseStatus = AdminCourse["status"];
+
+/** The package rules, served by the API so the panel and the validator agree. */
+export type CourseSpecInfo = {
+  spec: string;
+  manifestFilename: string;
+  schema: unknown;
+  limits: {
+    maxArchiveBytes: number;
+    maxTotalUncompressedBytes: number;
+    maxEntries: number;
+  };
+  allowedExtensions: string[];
+  validationCodes: string[];
+};
 
 type JsonBody<O extends keyof operations> = operations[O] extends {
   requestBody: { content: { "application/json": infer B } };
@@ -107,6 +127,43 @@ async function request<T>(
     );
   }
 
+  return payload as T;
+}
+
+/**
+ * Multipart, for the one endpoint that takes a file. Content-Type is left unset on
+ * purpose: the browser has to add it itself so it can include the boundary.
+ */
+async function requestMultipart<T>(
+  path: string,
+  body: FormData,
+  options: RequestOptions = {},
+): Promise<T> {
+  const url = `${apiBaseUrl()}${path}`;
+  const headers = new Headers(options.headers);
+  headers.set("accept", "application/json");
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      method: "POST",
+      headers,
+      credentials: "include",
+      body,
+      signal: options.signal,
+    });
+  } catch (cause) {
+    throw new BudApiUnreachableError(url, cause);
+  }
+
+  const payload = await readJson(response);
+  if (!response.ok) {
+    throw new BudApiError(
+      response.status,
+      payload as Partial<ErrorResponse> | null,
+      response.statusText || "Upload failed",
+    );
+  }
   return payload as T;
 }
 
@@ -269,6 +326,52 @@ export const budApi = {
       undefined,
       options,
     );
+  },
+
+  /** Every course, whatever its status — admin only. */
+  async adminCourses(options?: RequestOptions): Promise<AdminCourseList> {
+    return request<AdminCourseList>("GET", "/admin/courses", undefined, options);
+  },
+
+  async setCourseStatus(
+    id: string,
+    status: CourseStatus,
+    options?: RequestOptions,
+  ): Promise<AdminCourse> {
+    return request<AdminCourse>(
+      "PATCH",
+      `/admin/courses/${encodeURIComponent(id)}`,
+      { status },
+      options,
+    );
+  },
+
+  /** Which keys a course actually writes, against the ones its manifest declares. */
+  async courseStorageKeys(id: string, options?: RequestOptions): Promise<CourseStorageKeys> {
+    return request<CourseStorageKeys>(
+      "GET",
+      `/admin/courses/${encodeURIComponent(id)}/storage-keys`,
+      undefined,
+      options,
+    );
+  },
+
+  /** The package rules: limits, allowed extensions and the manifest JSON Schema. */
+  async courseSpec(options?: RequestOptions): Promise<CourseSpecInfo> {
+    return request<CourseSpecInfo>("GET", "/course-spec/schema", undefined, options);
+  },
+
+  /**
+   * Upload a course package.
+   *
+   * A bad package is a 201 with ok:false and the checklist — the upload succeeded,
+   * the package did not. Only a missing file or a duplicate version is a 400, so
+   * callers read `ok` rather than assuming 2xx means published.
+   */
+  async uploadCourse(file: File, options?: RequestOptions): Promise<IngestResult> {
+    const body = new FormData();
+    body.append("file", file, file.name);
+    return requestMultipart<IngestResult>("/admin/courses", body, options);
   },
 
   /** `me()` with 401 turned into null, for code that only asks "is anyone signed in?". */

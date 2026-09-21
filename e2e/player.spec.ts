@@ -89,15 +89,12 @@ test("work done in the course survives a reload and a fresh sign-in", async ({ p
   const written = `Survived a round trip at ${Date.now()}`;
 
   /**
-   * Start from a known worksheet. State persists per learner, so a previous run
-   * leaves the box already ticked — and check() on a ticked box is a no-op that
-   * fires no change event and therefore never saves. Clearing through the course's
-   * own button also exercises storage.delete against the real API.
+   * Force a change event whatever the starting state. State persists per learner, so
+   * a previous run leaves the box already ticked — and check() on a ticked box is a
+   * no-op that fires no change event, so the worksheet never saves and nothing
+   * reaches the API.
    */
-  page.on("dialog", (dialog) => dialog.accept());
-  await frame(page).getByRole("button", { name: "Clear saved work" }).click();
-  await expect(tick).not.toBeChecked();
-
+  await tick.uncheck({ force: true });
   await tick.check({ force: true });
   await expect(saved).toBeVisible();
 
@@ -145,6 +142,24 @@ test("completing a session moves the dashboard and the meter", async ({ page }) 
    */
 
   await resetSession1(page);
+});
+
+test("Clear saved work deletes the state through the bridge", async ({ page }) => {
+  await page.goto(`/learn/${SLUG}/${SESSION_1}`);
+
+  const tick = frame(page).locator("#t1");
+  await tick.uncheck({ force: true });
+  await tick.check({ force: true });
+  await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible();
+
+  // The worksheet confirm()s first, which only works because the frame is granted
+  // allow-modals — without it confirm() returns false and reset silently does nothing.
+  page.on("dialog", (dialog) => dialog.accept());
+  await frame(page).getByRole("button", { name: "Clear saved work" }).click();
+
+  await expect(tick).not.toBeChecked();
+  await page.reload();
+  await expect(tick).not.toBeChecked();
 });
 
 test("an unknown session key is a 404", async ({ page }) => {
