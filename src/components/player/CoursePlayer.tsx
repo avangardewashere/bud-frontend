@@ -155,12 +155,26 @@ export function CoursePlayer({
               ref={frameRef}
               onLoad={onFrameLoad}
               title={`${course.title} — ${session.title}`}
-              /* src is set by the bridge hook, once it is listening. Without
-                 allow-same-origin the frame gets an opaque origin and cannot reach
-                 the shell's cookies, storage or DOM. allow-modals because every
-                 worksheet confirm()s before clearing; clipboard-write for its copy
-                 and export buttons. */
-              sandbox="allow-scripts allow-forms allow-popups allow-modals"
+              /**
+               * src is set by the bridge hook, once it is listening. Without
+               * allow-same-origin the frame gets an opaque origin and cannot reach
+               * the shell's cookies, storage or DOM. allow-modals because every
+               * worksheet confirm()s before clearing; clipboard-write for its copy
+               * and export buttons.
+               *
+               * allow-popups is deliberately absent. A course legitimately holds its
+               * own learner's state, and connect-src 'none' on the courses origin is
+               * what stops it sending that anywhere — but CSP does not cover
+               * navigation, so a popup is an unpoliced way out: the value rides in a
+               * window.open URL, or the course hands its bridge port to the popup and
+               * lets that read the state instead. Both verified in
+               * tools/bridge-leak-probe.mjs, and both closed by leaving this off.
+               *
+               * The cost is that a course cannot open links in a new window. No
+               * session of the Docker course does. If one ever needs to, it wants a
+               * different answer than this flag.
+               */
+              sandbox="allow-scripts allow-forms allow-modals"
               allow="clipboard-write"
               className="size-full rounded-[var(--radius-card)] border border-[var(--border)] bg-white"
             />

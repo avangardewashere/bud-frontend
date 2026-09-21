@@ -78,10 +78,19 @@ export function useCourseBridge({
   const slow = slowSrc === src && !loaded;
 
   // Kept in a ref so the listener is attached once and never re-attached mid-session.
-  const ctx = useRef({ slug, sessionKey, onProgressChanged });
+  const ctx = useRef({ slug, sessionKey, onProgressChanged, src });
   useEffect(() => {
-    ctx.current = { slug, sessionKey, onProgressChanged };
+    ctx.current = { slug, sessionKey, onProgressChanged, src };
   });
+
+  /**
+   * The port belongs to the mounted document, so its lifetime is tied to `src` and
+   * not to an effect invocation. Closing it in an effect cleanup silently killed the
+   * bridge: a re-render with the same src (a router.refresh(), or React's
+   * development double-invoke) tore the port down, and since the frame was not
+   * reloaded, bridge.js never said hello again and every later call queued forever.
+   */
+  const portRef = useRef<{ src: string; port: MessagePort } | null>(null);
 
   const describe = useCallback((error: unknown): SaveError => {
     if (error instanceof BudApiUnreachableError) {
@@ -109,16 +118,21 @@ export function useCourseBridge({
     return { status: "error", message: "Couldn't save that.", permanent: false };
   }, []);
 
+  /**
+   * Attached once, for the life of the player. The handler reads the current course
+   * and session from a ref, so it never needs re-attaching — and a hello can never
+   * fall into the gap between removing and re-adding a listener.
+   */
   useEffect(() => {
-    let port: MessagePort | null = null;
+    const send = (message: unknown) => portRef.current?.port.postMessage(message);
 
     async function handle(msg: Request) {
-      const reply = (result: unknown) => port?.postMessage({ v: 1, id: msg.id, result });
+      const reply = (result: unknown) => send({ v: 1, id: msg.id, result });
       const replyError = (code: string, message: string) =>
-        port?.postMessage({ v: 1, id: msg.id, error: { code, message } });
+        send({ v: 1, id: msg.id, error: { code, message } });
 
       const params = (msg.params ?? {}) as { key?: string; value?: string; fraction?: number };
-      const { slug: courseSlug, sessionKey: key, onProgressChanged: changed } = ctx.current;
+      const { slug: courseSlug, sessionKey: key, onProgressChanged: changed, src: current } = ctx.current;
 
       try {
         switch (msg.method) {
@@ -149,7 +163,7 @@ export function useCourseBridge({
             reply({ ok: true });
             return;
           case "bud.ready":
-            setLoadedSrc(src);
+            setLoadedSrc(current);
             reply({ ok: true });
             return;
           case "bud.height":
@@ -170,19 +184,26 @@ export function useCourseBridge({
     function onHello(event: MessageEvent) {
       const target = frameRef.current?.contentWindow;
       if (!target || event.source !== target) return;
-      if (port) return; // one channel per mounted document
+
+      /**
+       * One channel per mounted document, ever. A second hello is either a document
+       * the course navigated to asking for a channel of its own, or a bug — and the
+       * window handle cannot tell them apart, because a WindowProxy follows the
+       * frame across navigation.
+       */
+      if (portRef.current) return;
 
       const msg = event.data as { v?: number; hello?: boolean } | undefined;
       if (!msg || msg.v !== 1 || msg.hello !== true) return;
 
       const channel = new MessageChannel();
-      port = channel.port1;
-      port.onmessage = (e) => {
+      channel.port1.onmessage = (e) => {
         const request = e.data as Request | undefined;
         if (!request || request.v !== 1 || typeof request.id !== "number") return;
         void handle(request);
       };
-      port.start();
+      channel.port1.start();
+      portRef.current = { src: ctx.current.src, port: channel.port1 };
 
       /**
        * "*" is unavoidable — the frame's origin is opaque and cannot be named — but
@@ -193,17 +214,28 @@ export function useCourseBridge({
     }
 
     window.addEventListener("message", onHello);
-
-    // Only now is it safe to load the course.
-    const frame = frameRef.current;
-    if (frame && frame.getAttribute("src") !== src) frame.setAttribute("src", src);
-
     return () => {
       window.removeEventListener("message", onHello);
-      port?.close();
-      port = null;
+      portRef.current?.port.close();
+      portRef.current = null;
     };
-  }, [src, describe]);
+  }, [describe]);
+
+  /**
+   * Loading the course is separate from listening, and deliberately second: the
+   * listener above is already attached, so the course's first storage.get — which
+   * the worksheets make while parsing — can never arrive with nobody to hear it.
+   */
+  useEffect(() => {
+    // A different session means a different document, so the old port is dead.
+    if (portRef.current && portRef.current.src !== src) {
+      portRef.current.port.close();
+      portRef.current = null;
+    }
+
+    const frame = frameRef.current;
+    if (frame && frame.getAttribute("src") !== src) frame.setAttribute("src", src);
+  }, [src]);
 
   /**
    * The worksheets load Google Fonts render-blocking. When that request hangs rather
