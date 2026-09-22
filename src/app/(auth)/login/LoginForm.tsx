@@ -1,9 +1,9 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { BudApiError, BudApiUnreachableError, budApi } from "@/lib/api";
+import { BudApiError, BudApiUnreachableError, BudApiWakingError, budApi } from "@/lib/api";
 
 /**
  * The sign-in form from mockup 1a.
@@ -17,6 +17,19 @@ export function LoginForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+
+  /**
+   * Wake the API while they type. On the $0 deploy it may have been asleep for hours,
+   * and a cold start takes about a minute — most of which can pass during the email
+   * and password rather than after pressing Continue. One request per visit, never on
+   * a timer. If it is slow, the waking notice explains why; its outcome is otherwise
+   * ignored, since sign-in reports its own errors.
+   */
+  useEffect(() => {
+    const controller = new AbortController();
+    budApi.wake({ signal: controller.signal }).catch(() => {});
+    return () => controller.abort();
+  }, []);
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
@@ -119,6 +132,9 @@ function Field({
 
 /** Voice: short, warm, specific (Design.md §8). Never "Oops! Something went wrong". */
 function messageFor(cause: unknown) {
+  if (cause instanceof BudApiWakingError) {
+    return "Bud's free server is still waking up. Give it a minute, then try again.";
+  }
   if (cause instanceof BudApiUnreachableError) {
     return "Couldn't reach Bud just now. Is the API running?";
   }

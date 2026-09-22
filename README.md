@@ -67,7 +67,32 @@ npx eslint src e2e tools
 npx playwright test
 ```
 
-`npx eslint .` works but is slow; it walks the build output. `e2e/auth.spec.ts` skips with a message when the API is not running, so a red suite always means the frontend broke.
+`npx eslint .` works but is slow; it walks the build output. The specs that need the API skip with a message when it isn't running, so a red suite always means the frontend broke.
+
+### Cold starts
+
+On the $0 deploy the API sleeps after 15 idle minutes and takes about a minute to wake. What the shell does about it:
+
+- **Browser calls** show a "waking up" notice once they have waited four seconds. A call that a gateway answered for is retried twice, after 4 and then 12 seconds. Only calls that are safe to repeat are retried.
+- **Course-state writes** stay in order per key, even across sessions. One that finally fails is sent again later, and closing the tab warns until it lands.
+- **A course whose saved work failed to load** can't save over it.
+- **Server renders** give up after 5 seconds. The error page then checks `/api/ready` itself, and carries on as soon as the API answers.
+
+`e2e/waking.spec.ts` covers the browser side by intercepting `/api`. The server side can't be intercepted, so `e2e/cold-start.spec.ts` needs a shell built in front of a proxy that can be put to sleep:
+
+```bash
+node tools/sleepy-proxy.mjs
+```
+
+```bash
+BUD_API_ORIGIN=http://127.0.0.1:3197 npm run build && BUD_API_ORIGIN=http://127.0.0.1:3197 npx next start -p 3100
+```
+
+```bash
+BUD_API_ORIGIN=http://127.0.0.1:3197 BUD_SLEEPY_PROXY=http://127.0.0.1:3197 npx playwright test
+```
+
+The proxy passes everything through while it's awake, so the whole suite runs that way. Without `BUD_SLEEPY_PROXY`, the cold-start spec skips.
 
 ## The API contract
 
@@ -108,6 +133,7 @@ courses/docker-fundamentals/1.0.0/   the Docker course package + bud.manifest.js
 public/bridge.js                     injected into every course HTML entry
 tools/courses-server.mjs             the courses origin, for development
 tools/bridge-leak-probe.mjs          guards the bridge against the exfiltration routes above
+tools/sleepy-proxy.mjs               an API you can put to sleep, for the cold-start spec
 src/proxy.ts                         the per-request nonce and CSP
 src/lib/config/origins.ts            the three origins, and the production build's check of them
 src/lib/config/limits.ts             how large an upload the /api rewrite can carry

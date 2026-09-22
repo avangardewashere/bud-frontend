@@ -41,6 +41,15 @@
   }
 
   var TIMEOUT_MS = 10000;
+  /**
+   * Storage calls wait much longer. On the free deploy the API sleeps, and a cold
+   * start holds a request for a minute or more. A worksheet whose storage.get timed
+   * out here would start from a blank sheet while the shell was still fetching the
+   * learner's work — and its next save would write that blank sheet over it. The
+   * shell always answers within this (STATE_LOAD_DEADLINE_MS in useCourseBridge.ts
+   * is shorter), so the course never gives up before the shell does.
+   */
+  var STORAGE_TIMEOUT_MS = 180000;
   var seq = 0;
   var pending = Object.create(null);
   var port = null;
@@ -95,7 +104,7 @@
       var timer = setTimeout(function () {
         delete pending[id];
         reject(new Error("bud bridge: " + method + " timed out"));
-      }, TIMEOUT_MS);
+      }, method.indexOf("storage.") === 0 ? STORAGE_TIMEOUT_MS : TIMEOUT_MS);
 
       pending[id] = { resolve: resolve, reject: reject, timer: timer };
 

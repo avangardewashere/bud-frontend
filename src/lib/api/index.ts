@@ -27,6 +27,7 @@ export {
 export {
   BudApiError,
   BudApiUnreachableError,
+  BudApiWakingError,
   type ErrorResponse,
   type FieldError,
 } from "./errors";

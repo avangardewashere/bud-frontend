@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/Button";
 import {
   BudApiError,
   BudApiUnreachableError,
+  BudApiWakingError,
   budApi,
   type CourseSpecInfo,
   type IngestResult,
@@ -66,7 +67,11 @@ export function UploadCourse({ spec }: { spec: CourseSpecInfo }) {
       if (ingest.ok) router.refresh();
     } catch (error) {
       setPreflight(
-        error instanceof BudApiUnreachableError
+        // Uploads are never retried automatically: resending up to 50MB unasked is
+        // not the client's call to make.
+        error instanceof BudApiWakingError
+          ? "Bud's server was asleep and missed that upload. Give it a minute, then upload again."
+          : error instanceof BudApiUnreachableError
           ? "Couldn't reach Bud just now."
           : error instanceof BudApiError
             ? error.message

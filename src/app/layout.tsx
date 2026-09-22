@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Nunito, Nunito_Sans, JetBrains_Mono } from "next/font/google";
 import { connection } from "next/server";
+import { WakingNotice } from "@/components/shell/WakingNotice";
 import "./globals.css";
 
 /** Design.md §5 — Nunito for display, Nunito Sans for UI, JetBrains Mono for anything tabular. */
@@ -47,7 +48,10 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
       lang="en"
       className={`${nunito.variable} ${nunitoSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col">{children}</body>
+      <body className="min-h-full flex flex-col">
+        {children}
+        <WakingNotice />
+      </body>
     </html>
   );
 }

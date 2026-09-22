@@ -70,7 +70,8 @@ export function CoursePlayer({
   }
 
   return (
-    <div className="flex h-dvh flex-col">
+    // data-course-player lets the waking notice clear this screen's bottom controls.
+    <div className="flex h-dvh flex-col" data-course-player>
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--card)] px-4">
         <Link
           href={`/courses/${course.slug}`}

@@ -3,7 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
-import { BudApiError, BudApiUnreachableError, budApi } from "@/lib/api";
+import { BudApiError, BudApiUnreachableError, BudApiWakingError, budApi } from "@/lib/api";
 
 /**
  * Enroll and unenroll. Both run in the browser so the session cookie goes with them,
@@ -29,7 +29,9 @@ export function EnrollButton({
       router.refresh();
     } catch (cause) {
       setError(
-        cause instanceof BudApiUnreachableError
+        cause instanceof BudApiWakingError
+          ? "Bud's server is still waking up. Try again in a minute."
+          : cause instanceof BudApiUnreachableError
           ? "Couldn't reach Bud just now."
           : cause instanceof BudApiError
             ? cause.message

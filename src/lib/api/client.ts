@@ -18,7 +18,19 @@
  */
 
 import { apiOrigin } from "@/lib/config/origins";
-import { BudApiError, BudApiUnreachableError, type ErrorResponse } from "./errors";
+import {
+  BudApiError,
+  BudApiUnreachableError,
+  BudApiWakingError,
+  type ErrorResponse,
+} from "./errors";
+import {
+  SERVER_API_TIMEOUT_MS,
+  WAKING_RETRY_DELAYS_MS,
+  trackRetry,
+  trackSlowCall,
+  wait,
+} from "./waking";
 import type { components, operations } from "./schema";
 
 export type PublicUser = components["schemas"]["PublicUser"];
@@ -90,21 +102,79 @@ export function apiBaseUrl() {
 export type RequestOptions = {
   headers?: HeadersInit;
   signal?: AbortSignal;
+  /**
+   * false for a call that must not be sent twice. A gateway error means no answer
+   * came back — not that the API never saw the request — so a retry can be a real
+   * duplicate. Set by the client's own methods, not by callers.
+   */
+  retry?: false;
 };
 
 type Method = "GET" | "POST" | "PUT" | "DELETE" | "PATCH";
 
+/**
+ * One API call, and what happens when the API is asleep.
+ *
+ * In the browser: a call still waiting after a few seconds raises the waking notice
+ * (src/lib/api/waking.ts), and a call a gateway answered for is retried twice before
+ * giving up. A gateway error means no answer came back, not that the API never saw
+ * the request — Vercel can give up on a request Render then delivers — so only calls
+ * that are safe to repeat are retried. Nearly all are: state writes replace a whole
+ * value (and stateWrites.ts keeps them in order), deletes and uncompletes set an
+ * absolute state, enrol and complete are upserts, progress never moves backwards, and
+ * a second sign-in is just another session. Registration and changing a password are
+ * not — a duplicate spends the invite or rejects the old password — and opt out with
+ * `retry: false`. The course upload is not a JSON call and is never retried.
+ *
+ * On the server: no retries, and a short timeout. A server component that waits out a
+ * cold start leaves the learner staring at a blank tab for a minute; one that gives
+ * up hands over to the error boundary, which shows the waking page and retries by
+ * itself once the API answers.
+ */
 async function request<T>(
   method: Method,
   path: string,
   body?: unknown,
   options: RequestOptions = {},
 ): Promise<T> {
+  if (typeof window === "undefined") {
+    return attempt<T>(method, path, body, options, SERVER_API_TIMEOUT_MS);
+  }
+
+  const settled = trackSlowCall();
+  let retrying: (() => void) | undefined;
+  try {
+    for (let retry = 0; ; retry++) {
+      try {
+        return await attempt<T>(method, path, body, options);
+      } catch (error) {
+        const delay = options.retry === false ? undefined : WAKING_RETRY_DELAYS_MS[retry];
+        if (!(error instanceof BudApiWakingError) || delay === undefined) throw error;
+        retrying ??= trackRetry();
+        await wait(delay, options.signal);
+      }
+    }
+  } finally {
+    retrying?.();
+    settled();
+  }
+}
+
+async function attempt<T>(
+  method: Method,
+  path: string,
+  body: unknown,
+  options: RequestOptions,
+  timeoutMs?: number,
+): Promise<T> {
   const url = `${apiBaseUrl()}${path}`;
 
   const headers = new Headers(options.headers);
   if (body !== undefined) headers.set("content-type", "application/json");
   headers.set("accept", "application/json");
+
+  const timeout = timeoutMs === undefined ? undefined : AbortSignal.timeout(timeoutMs);
+  const signals = [timeout, options.signal].filter((s): s is AbortSignal => s !== undefined);
 
   let response: Response;
   try {
@@ -114,17 +184,27 @@ async function request<T>(
       // The whole point: carry the httpOnly session cookie.
       credentials: "include",
       body: body === undefined ? undefined : JSON.stringify(body),
-      signal: options.signal,
+      signal: signals.length > 1 ? AbortSignal.any(signals) : signals[0],
       cache: "no-store",
     });
   } catch (cause) {
-    // fetch only rejects for network-level failures — including a refused preflight.
+    // Our own deadline, not the caller's abort: too slow to wait for from here.
+    if (timeout?.aborted && !options.signal?.aborted) throw new BudApiWakingError(url, cause);
+    // Otherwise fetch only rejects for network-level failures.
     throw new BudApiUnreachableError(url, cause);
   }
 
   if (response.status === 204) return undefined as T;
 
-  return settle<T>(url, response, await readBody(response), "Request failed");
+  let answer: Body;
+  try {
+    answer = await readBody(response);
+  } catch (cause) {
+    // The deadline can also land while the body is still arriving.
+    if (timeout?.aborted && !options.signal?.aborted) throw new BudApiWakingError(url, cause);
+    throw new BudApiUnreachableError(url, cause);
+  }
+  return settle<T>(url, response, answer, "Request failed");
 }
 
 /**
@@ -171,17 +251,18 @@ async function readBody(response: Response): Promise<Body> {
 /**
  * Every endpoint answers in JSON, so a body that is not JSON — or a 5xx with no body
  * at all — was written by something between the browser and the API: the rewrite's
- * own error page when the API is down or asleep, or a host's holding page. That is
- * "unreachable", whatever its status says. Through the rewrite this is the only way
- * an unreachable API shows up in the browser, since the fetch itself always reaches
- * the shell and succeeds.
+ * own error page when the API is down or asleep, a gateway timing out on a cold
+ * start, or a host's holding page. That is the API not answering, whatever the
+ * status says, so it is a BudApiWakingError: the case the client retries. Through the
+ * rewrite this is the only way a sleeping API shows up in the browser, since the
+ * fetch itself always reaches the shell and succeeds.
  */
 function settle<T>(url: string, response: Response, body: Body, fallback: string): T {
   if (!body.json) {
-    throw new BudApiUnreachableError(url, `${response.status}: ${body.text}`);
+    throw new BudApiWakingError(url, `${response.status}: ${body.text}`);
   }
   if (!response.ok && body.value === null && response.status >= 500) {
-    throw new BudApiUnreachableError(url, `${response.status} with an empty body`);
+    throw new BudApiWakingError(url, `${response.status} with an empty body`);
   }
   if (!response.ok) {
     throw new BudApiError(
@@ -207,7 +288,11 @@ export const budApi = {
 
   /** Invite-gated while signup is closed; 403 when the invite is missing or expired. */
   async register(body: RegisterBody, options?: RequestOptions): Promise<PublicUser> {
-    const result = await request<UserEnvelope>("POST", "/auth/register", body, options);
+    // Never retried: a duplicate finds its invite already spent.
+    const result = await request<UserEnvelope>("POST", "/auth/register", body, {
+      ...options,
+      retry: false,
+    });
     return result.user;
   },
 
@@ -217,11 +302,12 @@ export const budApi = {
   },
 
   async changePassword(body: ChangePasswordBody, options?: RequestOptions) {
+    // Never retried: a duplicate would be rejected for carrying the old password.
     return request<components["schemas"]["ChangePasswordResult"]>(
       "POST",
       "/auth/change-password",
       body,
-      options,
+      { ...options, retry: false },
     );
   },
 
@@ -387,6 +473,16 @@ export const budApi = {
     const body = new FormData();
     body.append("file", file, file.name);
     return requestMultipart<IngestResult>("/admin/courses", body, options);
+  },
+
+  /**
+   * Nudges a sleeping API awake and resolves once it answers. /health is the API's
+   * liveness check and never touches the database, so this costs the free database
+   * nothing. One call per human visit, never on a timer: keeping a free instance
+   * awake on purpose is against Render's rules and would burn Neon's compute hours.
+   */
+  async wake(options?: RequestOptions): Promise<void> {
+    await request<unknown>("GET", "/health", undefined, options);
   },
 
   /** `me()` with 401 turned into null, for code that only asks "is anyone signed in?". */

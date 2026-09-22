@@ -73,12 +73,35 @@ function normaliseMessage(message: unknown): string | undefined {
 export class BudApiUnreachableError extends Error {
   readonly cause?: unknown;
 
-  constructor(url: string, cause?: unknown) {
+  constructor(url: string, cause?: unknown, message?: string) {
     super(
-      `Could not reach the Bud API at ${url}. In the browser that path goes through ` +
-        `the shell's /api rewrite to BUD_API_ORIGIN; is the API running there?`,
+      message ??
+        `Could not reach the Bud API at ${url}. In the browser that path goes through ` +
+          `the shell's /api rewrite to BUD_API_ORIGIN; is the API running there?`,
     );
     this.name = "BudApiUnreachableError";
     this.cause = cause;
+  }
+}
+
+/**
+ * Something answered for the API, or nothing answered in time: a gateway error or a
+ * holding page from a proxy in front of it, or a server-side call that timed out. On
+ * the $0 deploy that is almost always Render's free instance waking up — it sleeps
+ * after 15 idle minutes and takes about a minute to start.
+ *
+ * A subclass, so every existing "unreachable" check still catches it; callers that
+ * can say something more useful ("waking up, give it a minute") check for this first.
+ * By the time a caller sees one, the browser client has already retried.
+ */
+export class BudApiWakingError extends BudApiUnreachableError {
+  constructor(url: string, cause?: unknown) {
+    super(
+      url,
+      cause,
+      `The Bud API at ${url} did not answer in time — asleep, starting, or behind a ` +
+        `proxy that answered for it.`,
+    );
+    this.name = "BudApiWakingError";
   }
 }

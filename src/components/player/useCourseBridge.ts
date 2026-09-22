@@ -1,7 +1,36 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BudApiError, BudApiUnreachableError, budApi } from "@/lib/api";
+import { BudApiError, BudApiUnreachableError, BudApiWakingError, budApi } from "@/lib/api";
+import { createStateWrites } from "./stateWrites";
+
+/**
+ * Every course-state write in this tab, ordered per key and re-sent if the API was
+ * away — see stateWrites.ts. Module state on purpose: one queue for the tab, which
+ * outlives any single player mount. Keys are "slug/key"; a slug cannot contain "/",
+ * so no two collide.
+ */
+const courseStateWrites = createStateWrites({
+  // The API away or asleep — worth sending again. A 4xx (quota, not enrolled) is not.
+  shouldResend: (error) => error instanceof BudApiUnreachableError,
+  resendDelaysMs: [30_000, 60_000, 120_000],
+});
+
+/** On sign-out: nothing queued should go out later under someone else's session. */
+export function abandonCourseStateWrites() {
+  courseStateWrites.abandon();
+}
+
+/**
+ * How long the shell will work at a storage.get before answering with an error. It
+ * must answer before bridge.js gives up on the call (STORAGE_TIMEOUT_MS there, 180s):
+ * a course whose load timed out on its side starts from a blank sheet, and the shell
+ * has to know that happened to protect the learner's saved work from it.
+ */
+const STATE_LOAD_DEADLINE_MS = 150_000;
+
+const DID_NOT_LOAD =
+  "Your saved work didn't load. Reload once Bud's server is back — changes here won't save until then.";
 
 /**
  * The shell half of the course bridge — Overall Plan §3, contract v1.
@@ -93,10 +122,19 @@ export function useCourseBridge({
   const portRef = useRef<{ src: string; port: MessagePort } | null>(null);
 
   const describe = useCallback((error: unknown): SaveError => {
+    // Already retried by the client by the time it gets here — and a write that
+    // failed this way is kept and sent again shortly (courseStateWrites).
+    if (error instanceof BudApiWakingError) {
+      return {
+        status: "error",
+        message: "Bud's server is waking up. Your work is safe in this tab and will save when it's back.",
+        permanent: false,
+      };
+    }
     if (error instanceof BudApiUnreachableError) {
       return {
         status: "error",
-        message: "Can't reach Bud. Your work is in this tab only.",
+        message: "Can't reach Bud. Your work is in this tab and will save when Bud is back.",
         permanent: false,
       };
     }
@@ -126,6 +164,35 @@ export function useCourseBridge({
   useEffect(() => {
     const send = (message: unknown) => portRef.current?.port.postMessage(message);
 
+    /**
+     * Keys whose load failed in the document currently mounted. A worksheet whose
+     * storage.get fails "carries on with a blank sheet", and its next storage.set
+     * would write that blank-based sheet over everything the learner had saved. So a
+     * write to such a key first asks the server again: if there is saved work there,
+     * the write is refused and the learner is told to reload. Reset per document.
+     */
+    const didNotLoad = new Set<string>();
+
+    // A write that failed earlier went through on a later re-send.
+    const unsubscribe = courseStateWrites.subscribe(({ key, ok }) => {
+      if (!key.startsWith(`${ctx.current.slug}/`)) return;
+      setSave(
+        ok
+          ? { status: "saved" }
+          : {
+              status: "error",
+              message: "Still can't reach Bud. Your work is in this tab — keep it open.",
+              permanent: false,
+            },
+      );
+    });
+
+    // Closing the tab with work only this tab has would lose it without a word.
+    function onBeforeUnload(event: BeforeUnloadEvent) {
+      if (courseStateWrites.hasUnsaved()) event.preventDefault();
+    }
+    window.addEventListener("beforeunload", onBeforeUnload);
+
     async function handle(msg: Request) {
       const reply = (result: unknown) => send({ v: 1, id: msg.id, result });
       const replyError = (code: string, message: string) =>
@@ -136,21 +203,64 @@ export function useCourseBridge({
 
       try {
         switch (msg.method) {
-          case "storage.get":
-            reply(await budApi.getState(courseSlug, String(params.key)));
+          case "storage.get": {
+            const stateKey = String(params.key);
+            const laneKey = `${courseSlug}/${stateKey}`;
+            // A write this tab has not landed yet is newer than anything the server has.
+            const queued = courseStateWrites.latest(laneKey);
+            if (queued) {
+              didNotLoad.delete(laneKey);
+              reply({ value: queued.kind === "set" ? queued.value : null });
+              return;
+            }
+            try {
+              const loaded = await budApi.getState(courseSlug, stateKey, {
+                signal: AbortSignal.timeout(STATE_LOAD_DEADLINE_MS),
+              });
+              didNotLoad.delete(laneKey);
+              reply(loaded);
+            } catch {
+              didNotLoad.add(laneKey);
+              setSave({ status: "error", message: DID_NOT_LOAD, permanent: true });
+              replyError("not_loaded", DID_NOT_LOAD);
+            }
             return;
+          }
           case "storage.set":
+          case "storage.delete": {
+            const stateKey = String(params.key);
+            const laneKey = `${courseSlug}/${stateKey}`;
+            if (didNotLoad.has(laneKey)) {
+              // The course started blank. Only let it write if there was nothing to lose.
+              let saved: string | null;
+              try {
+                saved = (await budApi.getState(courseSlug, stateKey)).value;
+              } catch {
+                saved = "unknown";
+              }
+              if (saved !== null) {
+                setSave({ status: "error", message: DID_NOT_LOAD, permanent: true });
+                replyError("not_loaded", DID_NOT_LOAD);
+                return;
+              }
+              didNotLoad.delete(laneKey);
+            }
+
             setSave({ status: "saving" });
-            await budApi.putState(courseSlug, String(params.key), String(params.value));
+            if (msg.method === "storage.set") {
+              const value = String(params.value);
+              await courseStateWrites.write(laneKey, { kind: "set", value }, async (signal) => {
+                await budApi.putState(courseSlug, stateKey, value, { signal });
+              });
+            } else {
+              await courseStateWrites.write(laneKey, { kind: "delete" }, async (signal) => {
+                await budApi.deleteState(courseSlug, stateKey, { signal });
+              });
+            }
             setSave({ status: "saved" });
             reply({ ok: true });
             return;
-          case "storage.delete":
-            setSave({ status: "saving" });
-            await budApi.deleteState(courseSlug, String(params.key));
-            setSave({ status: "saved" });
-            reply({ ok: true });
-            return;
+          }
           case "bud.complete":
             // The course suggests; the shell records. Its own state blob is untouched.
             await budApi.completeSession(courseSlug, key);
@@ -196,6 +306,9 @@ export function useCourseBridge({
       const msg = event.data as { v?: number; hello?: boolean } | undefined;
       if (!msg || msg.v !== 1 || msg.hello !== true) return;
 
+      // A new document loads its state afresh.
+      didNotLoad.clear();
+
       const channel = new MessageChannel();
       channel.port1.onmessage = (e) => {
         const request = e.data as Request | undefined;
@@ -216,6 +329,8 @@ export function useCourseBridge({
     window.addEventListener("message", onHello);
     return () => {
       window.removeEventListener("message", onHello);
+      window.removeEventListener("beforeunload", onBeforeUnload);
+      unsubscribe();
       portRef.current?.port.close();
       portRef.current = null;
     };

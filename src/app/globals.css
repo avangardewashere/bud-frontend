@@ -121,6 +121,15 @@
     letter-spacing: -0.01em;
   }
 
+  /*
+   * The waking notice floats above the bottom of the screen (WakingNotice.tsx). On a
+   * phone the player keeps Mark complete and the session sheet down there, so the
+   * notice sits above them rather than over them. Desktop places it by class.
+   */
+  :root:has([data-course-player]) {
+    --waking-offset: 9.5rem;
+  }
+
   /* Design.md §6 — reduced motion swaps movement for opacity. */
   @media (prefers-reduced-motion: reduce) {
     *,
