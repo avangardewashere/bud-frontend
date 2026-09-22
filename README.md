@@ -52,6 +52,8 @@ docker build -t bud-web \
   --build-arg BUD_API_ORIGIN=https://api.example .
 ```
 
+That is also why CI publishes an image only once there is somewhere to build it for. It always builds and scans one, so the Dockerfile is never broken unnoticed, but it pushes `ghcr.io/<owner>/bud-web` from `main` only when the three origins are set as **repository variables** (*Settings → Secrets and variables → Actions → Variables*). Unset, it says so in the run's summary and skips the push.
+
 The runtime stage carries Next's `standalone` output rather than `node_modules`, runs as the non-root `node` user, and serves with `node server.js` — `next` itself is not installed in that stage.
 
 Two things differ when the shell serves `/api` itself (the image, `next start`) rather than behind Vercel, whose edge router handles rewrites on its own:
@@ -63,11 +65,14 @@ Two things differ when the shell serves `/api` itself (the image, `next start`) 
 
 ```bash
 npm run typecheck
-npx eslint src e2e tools
+npm run lint
 npx playwright test
+node tools/bridge-leak-probe.mjs
 ```
 
-`npx eslint .` works but is slow; it walks the build output. The specs that need the API skip with a message when it isn't running, so a red suite always means the frontend broke.
+`npm run lint` covers `src`, `e2e`, `tools` and `next.config.ts`. `npx eslint .` works too but is slow; it walks the build output. The specs that need the API skip with a message when it isn't running, so a red suite always means the frontend broke.
+
+**CI** (`.github/workflows/ci.yml`) runs on every push and pull request: typecheck, lint, a production build, a check that a build still refuses blank origins, the bridge leak probe, and the container build with a vulnerability scan. The Playwright suite is deliberately *not* in CI — it skips itself without the API, so it would be green while proving nothing.
 
 ### Cold starts
 

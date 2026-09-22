@@ -8,7 +8,7 @@
     "courses": "node tools/courses-server.mjs",
     "build": "next build",
     "start": "next start -p 3100",
-    "lint": "eslint",
+    "lint": "eslint src e2e tools next.config.ts",
     "typecheck": "next typegen && tsc --noEmit",
     "api:types": "openapi-typescript http://localhost:3102/docs/openapi.json --output src/lib/api/schema.d.ts"
   },

@@ -1,0 +1,182 @@
+# Bud shell — CI
+#
+# checks  typecheck, lint, a production build, and that the build still refuses
+#         to ship with blank origins
+# probe   the bridge leak probe: the security guarantee the player rests on
+# image   builds the container; pushes to GHCR on main, when there is an
+#         environment to build it for
+#
+# The Playwright suite is NOT here. It needs the API and the courses origin, and
+# it skips itself when they are missing — so in CI it would be green while
+# proving nothing. It stays a local gate; see the README.
+#
+# Vercel builds this repo on its own. This runs beside that, not instead of it.
+
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
+permissions:
+  contents: read
+
+env:
+  NODE_VERSION: '22'
+  # The three origins are compiled into a build (the client bundle and the /api
+  # rewrite), so one is needed to build at all. These are reserved names that
+  # resolve nowhere: enough to compile and to prove the build works, never
+  # enough to run against. A real environment's values come from repository
+  # variables, in the image job below.
+  NEXT_PUBLIC_APP_ORIGIN: https://app.invalid
+  NEXT_PUBLIC_COURSES_ORIGIN: https://courses.invalid
+  BUD_API_ORIGIN: https://api.invalid
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run lint
+
+      # The guard from block 11, exercised rather than trusted: the first deploy
+      # shipped with all three origins blank, and the only sign was a CSP with no
+      # origins in it. A build must never get that far again.
+      - name: A production build refuses blank origins
+        env:
+          NEXT_PUBLIC_APP_ORIGIN: ''
+          NEXT_PUBLIC_COURSES_ORIGIN: ''
+          BUD_API_ORIGIN: ''
+        run: |
+          if npx next build > blank-origins.log 2>&1; then
+            echo "::error::A build with blank origins succeeded — the check in src/lib/config/origins.ts is not running."
+            exit 1
+          fi
+          grep -q "misconfigured for a production build" blank-origins.log \
+            || { echo "::error::The build failed for some other reason:"; cat blank-origins.log; exit 1; }
+          echo "Refused, as it should:"
+          grep -A4 "misconfigured for a production build" blank-origins.log
+
+      - run: npm run build
+
+  probe:
+    name: bridge leak probe
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: npm
+
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+
+      # Runs the real public/bridge.js across two real origins in Chromium, under
+      # the player's exact sandbox, and fails if a learner's saved work can reach
+      # a document the course chose. It needs no API, so unlike the Playwright
+      # suite it is worth running here — and it guards the one thing that would
+      # be worst to get wrong quietly.
+      - run: node tools/bridge-leak-probe.mjs
+
+  image:
+    runs-on: ubuntu-latest
+    needs: [checks, probe]
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: docker/setup-buildx-action@v3
+
+      # Unlike the API's image, this one is environment-specific: the origins are
+      # compiled in, so an image cannot be re-pointed by changing env vars. A
+      # push therefore needs somewhere real to build it for — set the three
+      # repository variables (Settings → Secrets and variables → Actions →
+      # Variables) and it publishes; leave them unset and CI still builds and
+      # scans the image, which is what proves the Dockerfile works.
+      - id: target
+        env:
+          APP: ${{ vars.NEXT_PUBLIC_APP_ORIGIN }}
+          COURSES: ${{ vars.NEXT_PUBLIC_COURSES_ORIGIN }}
+          API: ${{ vars.BUD_API_ORIGIN }}
+        run: |
+          if [ -n "$APP" ] && [ -n "$COURSES" ] && [ -n "$API" ]; then
+            echo "real=true" >> "$GITHUB_OUTPUT"
+            echo "app=$APP" >> "$GITHUB_OUTPUT"
+            echo "courses=$COURSES" >> "$GITHUB_OUTPUT"
+            echo "api=$API" >> "$GITHUB_OUTPUT"
+          else
+            echo "real=false" >> "$GITHUB_OUTPUT"
+            echo "app=${{ env.NEXT_PUBLIC_APP_ORIGIN }}" >> "$GITHUB_OUTPUT"
+            echo "courses=${{ env.NEXT_PUBLIC_COURSES_ORIGIN }}" >> "$GITHUB_OUTPUT"
+            echo "api=${{ env.BUD_API_ORIGIN }}" >> "$GITHUB_OUTPUT"
+            echo "::notice::Built with placeholder origins and not pushed. Set NEXT_PUBLIC_APP_ORIGIN, NEXT_PUBLIC_COURSES_ORIGIN and BUD_API_ORIGIN as repository variables to publish a usable image."
+          fi
+
+      - uses: docker/login-action@v3
+        if: steps.target.outputs.real == 'true' && github.ref == 'refs/heads/main'
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository_owner }}/bud-web
+          tags: |
+            type=sha,prefix=sha-,format=short
+            type=raw,value=latest,enable=${{ github.ref == 'refs/heads/main' }}
+
+      # Built into the local daemon first, so every run — pull requests included
+      # — builds and scans the image even when nothing is pushed.
+      - uses: docker/build-push-action@v6
+        with:
+          context: .
+          load: true
+          tags: bud-web:ci
+          build-args: |
+            NEXT_PUBLIC_APP_ORIGIN=${{ steps.target.outputs.app }}
+            NEXT_PUBLIC_COURSES_ORIGIN=${{ steps.target.outputs.courses }}
+            BUD_API_ORIGIN=${{ steps.target.outputs.api }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Scan the image
+        uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25 # v0.36.0
+        with:
+          image-ref: bud-web:ci
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          # Visible, not blocking, until the baseline is clean — as in the API's CI.
+          exit-code: '0'
+
+      # The same build, fully cached, now with the real tags.
+      - uses: docker/build-push-action@v6
+        if: steps.target.outputs.real == 'true' && github.ref == 'refs/heads/main'
+        with:
+          context: .
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          build-args: |
+            NEXT_PUBLIC_APP_ORIGIN=${{ steps.target.outputs.app }}
+            NEXT_PUBLIC_COURSES_ORIGIN=${{ steps.target.outputs.courses }}
+            BUD_API_ORIGIN=${{ steps.target.outputs.api }}
+          cache-from: type=gha
