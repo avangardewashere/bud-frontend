@@ -48,8 +48,18 @@ const TYPES = {
  * The worksheets carry inline <style> and <script>, so both need 'unsafe-inline'.
  * That is acceptable for an opaque-origin frame with no cookie or storage access;
  * the long-term fix is hashing inline scripts at upload time.
+ *
+ * `sandbox` makes a course document opaque-origin however it is reached — in the
+ * player's iframe, opened directly, or through any proxy that puts it on another
+ * origin — rather than relying on the iframe's attribute alone. The flags are
+ * exactly the player iframe's (src/components/player/CoursePlayer.tsx) and the
+ * backend's COURSE_SANDBOX_FLAGS: tighter breaks courses in the player, looser is a
+ * hole. Never allow-same-origin, allow-popups or allow-top-navigation.
  */
+export const COURSE_SANDBOX_FLAGS = "allow-scripts allow-forms allow-modals";
+
 const CSP = [
+  `sandbox ${COURSE_SANDBOX_FLAGS}`,
   `default-src 'none'`,
   `script-src ${COURSES_ORIGIN} ${APP_ORIGIN} 'unsafe-inline'`,
   `style-src ${COURSES_ORIGIN} 'unsafe-inline' https://fonts.googleapis.com`,

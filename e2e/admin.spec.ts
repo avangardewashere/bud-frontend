@@ -81,6 +81,36 @@ test("a broken package comes back as a checklist, not a crash", async ({ page })
   await expect(page.getByText("Publish unlocks when the errors are fixed.")).toBeVisible();
 });
 
+/**
+ * Uploads travel through the shell's /api rewrite, and Next's router cuts request
+ * bodies off at 10MB unless told otherwise. A package over that used to reach the API
+ * truncated, hang until the proxy gave up, and come back as "Couldn't reach Bud" — for
+ * an archive well under the 50MB cap. Any answer from the API proves the whole body
+ * arrived: a truncated one never gets one.
+ */
+test("an archive past Next's default 10MB body limit still reaches the API whole", async ({
+  page,
+}) => {
+  test.slow();
+  await signIn(page, ADMIN);
+  await page.goto("/admin/courses");
+
+  const uploaded = page.waitForResponse(
+    (r) => r.request().method() === "POST" && r.url().endsWith("/api/admin/courses"),
+  );
+  await page.setInputFiles('input[type="file"]', {
+    name: "large-broken-course.zip",
+    mimeType: "application/zip",
+    buffer: Buffer.concat([Buffer.from("PK not really"), Buffer.alloc(12 * 1024 * 1024, 0x20)]),
+  });
+
+  const response = await uploaded;
+  expect(response.headers()["content-type"] ?? "", "the API should have answered").toContain(
+    "application/json",
+  );
+  await expect(page.getByTestId("validation-results")).toBeVisible();
+});
+
 test("publishing and unpublishing round-trips", async ({ page }) => {
   await signIn(page, ADMIN);
   await page.goto("/admin/courses");

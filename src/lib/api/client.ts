@@ -14,11 +14,10 @@
  *   becomes a BudApiError with the status, the field errors and the rest intact,
  *   rather than each caller re-parsing the body.
  *
- * The API's CORS allows exactly http://localhost:3100, with credentials. Reaching
- * the shell on 127.0.0.1:3100 instead is a different host: the preflight fails and
- * the cookie would not match anyway.
+ * Where requests go depends on who is asking — see apiBaseUrl().
  */
 
+import { apiOrigin } from "@/lib/config/origins";
 import { BudApiError, BudApiUnreachableError, type ErrorResponse } from "./errors";
 import type { components, operations } from "./schema";
 
@@ -64,16 +63,24 @@ export type LoginBody = JsonBody<"AuthController_login">;
 export type RegisterBody = JsonBody<"AuthController_register">;
 export type ChangePasswordBody = JsonBody<"AuthController_changePassword">;
 
-const DEFAULT_BASE_URL = "http://localhost:3102";
-
 const statePath = (slug: string, key: string) =>
   `/me/courses/${encodeURIComponent(slug)}/state/${encodeURIComponent(key)}`;
 
 const sessionPath = (slug: string, sessionKey: string) =>
   `/me/courses/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(sessionKey)}`;
 
+/**
+ * The browser always calls /api on the shell's own origin, which the rewrite in
+ * next.config.ts forwards to the API. That keeps the session cookie first-party on
+ * the app's host — the only way it works when the app and API are different sites —
+ * and means no CORS preflight at all.
+ *
+ * Server components call the API directly: "/api" has no host under Node, a
+ * server-to-server call gains nothing from the detour, and serverAuth() already
+ * forwards the learner's cookie by hand.
+ */
 export function apiBaseUrl() {
-  return (process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_BASE_URL).replace(/\/+$/, "");
+  return typeof window === "undefined" ? apiOrigin() : "/api";
 }
 
 /**
@@ -117,17 +124,7 @@ async function request<T>(
 
   if (response.status === 204) return undefined as T;
 
-  const payload = await readJson(response);
-
-  if (!response.ok) {
-    throw new BudApiError(
-      response.status,
-      payload as Partial<ErrorResponse> | null,
-      response.statusText || "Request failed",
-    );
-  }
-
-  return payload as T;
+  return settle<T>(url, response, await readBody(response), "Request failed");
 }
 
 /**
@@ -156,26 +153,44 @@ async function requestMultipart<T>(
     throw new BudApiUnreachableError(url, cause);
   }
 
-  const payload = await readJson(response);
+  return settle<T>(url, response, await readBody(response), "Upload failed");
+}
+
+type Body = { json: true; value: unknown } | { json: false; text: string };
+
+async function readBody(response: Response): Promise<Body> {
+  const text = await response.text();
+  if (text.length === 0) return { json: true, value: null };
+  try {
+    return { json: true, value: JSON.parse(text) };
+  } catch {
+    return { json: false, text: text.slice(0, 200) };
+  }
+}
+
+/**
+ * Every endpoint answers in JSON, so a body that is not JSON — or a 5xx with no body
+ * at all — was written by something between the browser and the API: the rewrite's
+ * own error page when the API is down or asleep, or a host's holding page. That is
+ * "unreachable", whatever its status says. Through the rewrite this is the only way
+ * an unreachable API shows up in the browser, since the fetch itself always reaches
+ * the shell and succeeds.
+ */
+function settle<T>(url: string, response: Response, body: Body, fallback: string): T {
+  if (!body.json) {
+    throw new BudApiUnreachableError(url, `${response.status}: ${body.text}`);
+  }
+  if (!response.ok && body.value === null && response.status >= 500) {
+    throw new BudApiUnreachableError(url, `${response.status} with an empty body`);
+  }
   if (!response.ok) {
     throw new BudApiError(
       response.status,
-      payload as Partial<ErrorResponse> | null,
-      response.statusText || "Upload failed",
+      body.value as Partial<ErrorResponse> | null,
+      response.statusText || fallback,
     );
   }
-  return payload as T;
-}
-
-async function readJson(response: Response): Promise<unknown> {
-  const text = await response.text();
-  if (text.length === 0) return null;
-  try {
-    return JSON.parse(text);
-  } catch {
-    // A proxy or an error page rather than the API. Keep the body for the message.
-    return { message: text.slice(0, 200) };
-  }
+  return body.value as T;
 }
 
 /**

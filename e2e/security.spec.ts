@@ -1,6 +1,6 @@
 import { test, expect, type Page } from "@playwright/test";
 import { createServer, type Server } from "node:http";
-import { LEARNER, openSession, signIn, skipWithoutApi } from "./support/api";
+import { API, LEARNER, openSession, signIn, skipWithoutApi } from "./support/api";
 
 /**
  * The shell's Content-Security-Policy, and the one thing it is really for.
@@ -61,6 +61,128 @@ test("the shell sends a CSP naming the courses origin", async ({ page }) => {
   expect(csp).toContain(process.env.NEXT_PUBLIC_COURSES_ORIGIN ?? "127.0.0.1:3101");
   // Bud is not embeddable by anyone.
   expect(csp).toContain("frame-ancestors 'none'");
+
+  // The browser reaches the API only through /api on the app's own origin, so the
+  // policy must not name the API's real address — nothing legitimate needs it.
+  const connect = /connect-src ([^;]*)/.exec(csp)?.[1] ?? "";
+  expect(connect).toContain("'self'");
+  expect(connect).not.toContain(new URL(API).host);
+});
+
+/**
+ * Why /api exists at all. On the free hosts the app and the API are different sites,
+ * so a cookie the API sets on its own host never reaches the app — sign-in "works"
+ * and every page then bounces to /login. Locally both are "localhost", which would
+ * hide that failure completely; asserting that the browser never addresses the API
+ * directly is what keeps the local run honest about production.
+ */
+test("the browser reaches the API only through the app's own origin", async ({
+  page,
+  context,
+  baseURL,
+}) => {
+  const app = new URL(baseURL!);
+  const api = new URL(API);
+  const direct: string[] = [];
+  const proxied: string[] = [];
+  page.on("request", (request) => {
+    const url = new URL(request.url());
+    const call = `${request.method()} ${url.pathname}`;
+    if (url.host === api.host) direct.push(call);
+    if (url.host === app.host && url.pathname.startsWith("/api/")) proxied.push(call);
+  });
+
+  // beforeEach has already signed in; start again, this time under observation.
+  await context.clearCookies();
+  const login = page.waitForResponse((r) => r.url().endsWith("/auth/login"));
+  await signIn(page, LEARNER);
+  await openPlayer(page);
+  const tick = page.frameLocator('iframe[title*="Docker"]').locator("#t1");
+  await tick.uncheck({ force: true });
+  await tick.check({ force: true });
+  await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible();
+
+  expect(direct, "the browser called the API's own origin").toEqual([]);
+  expect(proxied).toContain("POST /api/auth/login");
+  expect(
+    proxied.some((call) => call.startsWith("PUT /api/me/courses/")),
+    "bridge saves should go through /api",
+  ).toBe(true);
+
+  /**
+   * And so the session cookie was set by a response from the app's own host, where
+   * server components read it. Checked by where the Set-Cookie came from rather than
+   * by the cookie's domain: locally app and API are both "localhost" and cookies
+   * ignore ports, so the domain would match whichever host had set it.
+   */
+  const loginResponse = await login;
+  expect(new URL(loginResponse.url()).host).toBe(app.host);
+  expect(await loginResponse.headerValue("set-cookie")).toContain("bud_session=");
+  expect((await context.cookies()).some((c) => c.name === "bud_session")).toBe(true);
+});
+
+/**
+ * The rewrite forwards the API's own prefixes and nothing else. A catch-all once
+ * put course HTML on the shell's origin — on the free deploy the API's host serves
+ * course content too — so a course path under /api must be answered by the shell
+ * (a 404 page), never by whatever is behind the rewrite.
+ */
+test("the shell forwards the API's paths and never course content", async ({ page }) => {
+  const get = (path: string) => page.request.get(path, { failOnStatusCode: false });
+  const fromApi = (res: Awaited<ReturnType<typeof get>>) =>
+    (res.headers()["content-type"] ?? "").includes("application/json");
+
+  // Forwarded: the API answers, in JSON, whether or not we are signed in.
+  for (const path of ["/api/health", "/api/courses", "/api/auth/providers", "/api/me"]) {
+    expect(fromApi(await get(path)), `${path} should reach the API`).toBe(true);
+  }
+
+  /**
+   * Not forwarded: course-shaped paths, including ones whose slug is an API prefix,
+   * and anything outside the API's prefixes. Identified positively as the shell's own
+   * 404 page — its copy, and the shell's CSP, which only pages the shell renders
+   * carry. Merely "not JSON" would not do: on the deploy the API's host serves
+   * courses too, and a course server's 404 is not JSON either.
+   */
+  for (const path of [
+    `/api/${SLUG}/1.0.0/docker-session-1-worksheet.html`,
+    "/api/admin/1.0.0/index.html",
+    "/api/me/2.3.4/notes.html",
+    "/api/docs",
+    "/apiary",
+  ]) {
+    const res = await get(path);
+    expect(res.status(), `${path} should not be forwarded`).toBe(404);
+    expect(await res.text(), `${path} should be the shell's own 404`).toContain(
+      "This page could not be found",
+    );
+    expect(res.headers()["content-security-policy"] ?? "", `${path} lacks the shell's CSP`).toContain(
+      "frame-ancestors 'none'",
+    );
+  }
+});
+
+/**
+ * The courses origin sandboxes every course document itself, with exactly the
+ * player iframe's flags, so a course reached outside the player — opened directly,
+ * or through any proxy — still gets an opaque origin. Looser than the iframe would
+ * be a hole; tighter would break courses inside the player.
+ */
+test("course documents carry the player's sandbox, flag for flag", async ({ page }) => {
+  await openPlayer(page);
+  const iframeFlags = await page.locator('iframe[title*="Docker"]').getAttribute("sandbox");
+
+  const frame = page.frames().find((f) => f.url().includes("/docker-session-1"));
+  const res = await page.request.get(frame!.url());
+  const csp = res.headers()["content-security-policy"] ?? "";
+  const sandbox = /(?:^|;\s*)sandbox ([^;]*)/.exec(csp)?.[1].trim();
+
+  const flags = (value?: string | null) => (value ?? "").split(/\s+/).filter(Boolean).sort();
+  expect(flags(sandbox), "the courses origin must send a sandbox directive").not.toEqual([]);
+  expect(flags(sandbox)).toEqual(flags(iframeFlags));
+  for (const forbidden of ["allow-same-origin", "allow-popups", "allow-top-navigation"]) {
+    expect(flags(sandbox)).not.toContain(forbidden);
+  }
 });
 
 test("scripts are locked to a fresh per-request nonce", async ({ page }) => {

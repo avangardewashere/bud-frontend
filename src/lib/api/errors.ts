@@ -66,17 +66,17 @@ function normaliseMessage(message: unknown): string | undefined {
 }
 
 /**
- * The request never reached the API, or the reply was not the envelope: a wrong base
- * URL, the backend not running, or a CORS preflight the browser refused. Worth its own
- * type, because the fix is operational rather than anything the user did.
+ * The request never reached the API, or the reply was not the API's: the backend not
+ * running or asleep, a wrong BUD_API_ORIGIN, or a host's error page in between. Worth
+ * its own type, because the fix is operational rather than anything the user did.
  */
 export class BudApiUnreachableError extends Error {
   readonly cause?: unknown;
 
   constructor(url: string, cause?: unknown) {
     super(
-      `Could not reach the Bud API at ${url}. Is it running, and is this page served ` +
-        `from http://localhost:3100? Its CORS allows that origin only.`,
+      `Could not reach the Bud API at ${url}. In the browser that path goes through ` +
+        `the shell's /api rewrite to BUD_API_ORIGIN; is the API running there?`,
     );
     this.name = "BudApiUnreachableError";
     this.cause = cause;

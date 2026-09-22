@@ -10,6 +10,7 @@ import {
   type CourseSpecInfo,
   type IngestResult,
 } from "@/lib/api";
+import { UPLOAD_ARCHIVE_CEILING_BYTES } from "@/lib/config/limits";
 import { ValidationChecklist } from "./ValidationChecklist";
 
 /**
@@ -22,7 +23,10 @@ import { ValidationChecklist } from "./ValidationChecklist";
  * saves pushing 60MB before being told no.
  *
  * The cap comes from the API's own /course-spec/schema rather than a constant here,
- * for the same reason.
+ * for the same reason — except that it can never exceed what the shell's /api
+ * rewrite is sized to carry (src/lib/config/limits.ts). If the API ever raises its
+ * cap past that, an oversized archive is refused here with a size message instead of
+ * being cut off in transit and reported as "unreachable".
  */
 export function UploadCourse({ spec }: { spec: CourseSpecInfo }) {
   const router = useRouter();
@@ -33,13 +37,14 @@ export function UploadCourse({ spec }: { spec: CourseSpecInfo }) {
   const [preflight, setPreflight] = useState<string | null>(null);
   const [result, setResult] = useState<IngestResult | null>(null);
 
-  const maxMb = Math.round(spec.limits.maxArchiveBytes / (1024 * 1024));
+  const maxBytes = Math.min(spec.limits.maxArchiveBytes, UPLOAD_ARCHIVE_CEILING_BYTES);
+  const maxMb = Math.round(maxBytes / (1024 * 1024));
 
   function checkBeforeUploading(file: File) {
     if (!file.name.toLowerCase().endsWith(".zip")) {
       return "A course is a .zip containing bud.manifest.json and its files.";
     }
-    if (file.size > spec.limits.maxArchiveBytes) {
+    if (file.size > maxBytes) {
       return `That archive is ${Math.round(file.size / (1024 * 1024))} MB. The limit is ${maxMb} MB.`;
     }
     return null;

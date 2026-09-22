@@ -1,5 +1,6 @@
 import { NextResponse, type NextRequest } from "next/server";
-import { buildCsp, createNonce, originOf } from "@/lib/security/csp";
+import { appOrigin, coursesOrigin } from "@/lib/config/origins";
+import { buildCsp, createNonce } from "@/lib/security/csp";
 
 /**
  * Puts a fresh nonce and the Content-Security-Policy on every page request.
@@ -14,9 +15,8 @@ import { buildCsp, createNonce, originOf } from "@/lib/security/csp";
  * was built for.
  */
 
-const APP_ORIGIN = process.env.NEXT_PUBLIC_APP_ORIGIN ?? "http://localhost:3100";
-const API_ORIGIN = originOf(process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://localhost:3102");
-const COURSES_ORIGIN = process.env.NEXT_PUBLIC_COURSES_ORIGIN ?? "http://127.0.0.1:3101";
+const APP_ORIGIN = appOrigin();
+const COURSES_ORIGIN = coursesOrigin();
 
 export function proxy(request: NextRequest) {
   const nonce = createNonce();
@@ -24,7 +24,6 @@ export function proxy(request: NextRequest) {
     nonce,
     isDev: process.env.NODE_ENV === "development",
     appOrigin: APP_ORIGIN,
-    apiOrigin: API_ORIGIN,
     coursesOrigin: COURSES_ORIGIN,
   });
 
@@ -44,8 +43,16 @@ export const config = {
        * Pages only. Built assets, image optimisation and the favicon are not documents,
        * so a policy on them does nothing but cost a nonce. bridge.js is excluded too:
        * it is loaded by a course's document, whose policy is the courses origin's to set.
+       *
+       * Of /api, only what the rewrite in next.config.ts actually forwards is skipped —
+       * the API's own prefixes, minus the course-shaped /{x}/{version}/ paths the
+       * rewrite refuses. Everything else there is a page the shell renders itself (a
+       * 404), and gets the policy like any other; a blanket "api" once also skipped
+       * those, and any route merely starting with "api". Keep the prefixes in step with
+       * the rewrite: this must be a literal, which Next reads at build time.
        */
-      source: "/((?!api|_next/static|_next/image|favicon.ico|bridge.js|icon.svg).*)",
+      source:
+        "/((?!api/(?:auth|me|courses|admin|course-spec)(?:/(?![0-9]+\\.[0-9]+\\.[0-9]+)|$)|api/(?:health|ready)$|_next/static|_next/image|favicon.ico|bridge.js|icon.svg).*)",
       // Prefetches are not rendered for display, so they need no nonce of their own.
       missing: [
         { type: "header", key: "next-router-prefetch" },

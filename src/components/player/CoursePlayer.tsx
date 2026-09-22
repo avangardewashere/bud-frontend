@@ -173,6 +173,12 @@ export function CoursePlayer({
                * The cost is that a course cannot open links in a new window. No
                * session of the Docker course does. If one ever needs to, it wants a
                * different answer than this flag.
+               *
+               * The courses origin repeats these exact flags as a CSP `sandbox`
+               * directive (the backend's COURSE_SANDBOX_FLAGS, and
+               * tools/courses-server.mjs), so a course is sandboxed even when it is
+               * reached outside this frame. Change one, change all three;
+               * e2e/security.spec.ts fails if they drift.
                */
               sandbox="allow-scripts allow-forms allow-modals"
               allow="clipboard-write"

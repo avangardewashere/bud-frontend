@@ -3,11 +3,11 @@ import { notFound, redirect } from "next/navigation";
 import { CoursePlayer } from "@/components/player/CoursePlayer";
 import { BudApiError, budApi, type CourseDetail } from "@/lib/api";
 import { serverAuth } from "@/lib/api/session";
+import { coursesOrigin } from "@/lib/config/origins";
 
 type Params = { params: Promise<{ slug: string; sessionKey: string }> };
 
-const COURSES_ORIGIN =
-  process.env.NEXT_PUBLIC_COURSES_ORIGIN ?? "http://127.0.0.1:3101";
+const COURSES_ORIGIN = coursesOrigin();
 
 async function load(slug: string): Promise<CourseDetail> {
   try {

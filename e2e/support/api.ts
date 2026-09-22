@@ -7,7 +7,12 @@ import { expect, test, type Page } from "@playwright/test";
  * red suite always means the frontend broke rather than that a sibling service is down.
  */
 
-export const API = "http://localhost:3102";
+/**
+ * Where the API really is — the same BUD_API_ORIGIN the shell forwards /api to, so
+ * the suite probes, and asserts against, the API the shell under test is using.
+ * Test-side only: the browser never calls it directly.
+ */
+export const API = (process.env.BUD_API_ORIGIN ?? "http://localhost:3102").replace(/\/+$/, "");
 
 /** The backend's seeded admin (SEED_ADMIN_PASSWORD in its .env). */
 export const ADMIN = {

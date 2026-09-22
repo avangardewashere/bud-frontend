@@ -89,6 +89,13 @@ test("the rail shows every session and marks the current one", async ({ page }) 
 
 /** The exit criterion, in one test. */
 test("work done in the course survives a reload and a fresh sign-in", async ({ page }) => {
+  /**
+   * The longest journey in the suite: two sign-ins, a reload and three course loads.
+   * Against a production build it takes ~22s; against `next dev` on this machine,
+   * which compiles each route on first visit, it runs 50–70s and sometimes crossed
+   * the 60s default mid-way through loading the frame. Slow, not stuck.
+   */
+  test.slow();
   await resetSession1(page);
   await openSession(page, SLUG, SESSION_1);
 

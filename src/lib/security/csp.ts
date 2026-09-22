@@ -12,11 +12,10 @@ export type CspOptions = {
   /** Development needs 'unsafe-eval' for React's error overlays, and un-nonced styles. */
   isDev: boolean;
   appOrigin: string;
-  apiOrigin: string;
   coursesOrigin: string;
 };
 
-export function buildCsp({ nonce, isDev, appOrigin, apiOrigin, coursesOrigin }: CspOptions) {
+export function buildCsp({ nonce, isDev, appOrigin, coursesOrigin }: CspOptions) {
   const directives: Record<string, string[]> = {
     "default-src": ["'self'"],
 
@@ -59,10 +58,12 @@ export function buildCsp({ nonce, isDev, appOrigin, apiOrigin, coursesOrigin }: 
     "font-src": ["'self'"],
 
     /**
-     * The API is a different origin, so without it every fetch the app makes would be
-     * refused. Development also needs the HMR websocket on the app's own host.
+     * Same-origin only. The browser reaches the API through the /api rewrite on the
+     * app's own origin, never directly, so the API's real address has no business
+     * here — naming it would only widen where a script could send data. Development
+     * also needs the HMR websocket on the app's own host.
      */
-    "connect-src": ["'self'", apiOrigin, ...(isDev ? [appOrigin.replace(/^http/, "ws")] : [])],
+    "connect-src": ["'self'", ...(isDev ? [appOrigin.replace(/^http/, "ws")] : [])],
 
     /**
      * The reason this policy first existed. A course can navigate its own frame, and
@@ -94,13 +95,4 @@ export function buildCsp({ nonce, isDev, appOrigin, apiOrigin, coursesOrigin }: 
 /** A random 128-bit value, base64 — what the CSP spec asks a nonce to be. */
 export function createNonce() {
   return Buffer.from(crypto.randomUUID()).toString("base64");
-}
-
-/** "http://localhost:3102/api" → "http://localhost:3102". CSP sources are origins. */
-export function originOf(url: string) {
-  try {
-    return new URL(url).origin;
-  } catch {
-    return url;
-  }
 }

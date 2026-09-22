@@ -12,11 +12,13 @@ export async function serverAuth(): Promise<RequestOptions> {
 /**
  * Server-side session lookup, for layouts and server components.
  *
- * Why this works across two ports: the API sets `bud_session` for host `localhost`,
- * and cookies ignore ports, so the browser sends it to the shell on :3100 as well as
- * to the API on :3102. The shell can therefore read it off the incoming request and
- * forward it. That same port-blindness is exactly why the courses origin is a
- * different *host* (127.0.0.1:3101) rather than just another port — see
+ * Why the shell has the cookie at all: the browser signs in through the /api rewrite
+ * on the shell's own origin, so the API's `bud_session` is set on the *app's* host,
+ * and comes back with every page request. The shell reads it off the incoming request
+ * and forwards it to BUD_API_ORIGIN by hand. (Before the rewrite this only worked
+ * locally, where cookies ignoring ports let localhost:3102's cookie reach :3100; on
+ * two different sites it never would.) Cookies ignoring ports is also why the courses
+ * origin is a different *host* (127.0.0.1:3101), not just another port — see
  * tools/courses-server.mjs.
  *
  * Server-only: this imports next/headers, so it is deliberately not re-exported from

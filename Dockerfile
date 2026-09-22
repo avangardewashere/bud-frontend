@@ -22,16 +22,20 @@ WORKDIR /app
 COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
-# NEXT_PUBLIC_* values are inlined into the client bundle at build time, so they
-# are build arguments rather than runtime environment. An image built for one
+# All three origins are fixed at build time, so they are build arguments rather
+# than runtime environment: NEXT_PUBLIC_* values are inlined into the client bundle,
+# and BUD_API_ORIGIN is compiled into the /api rewrite. An image built for one
 # environment cannot be re-pointed at another by changing env vars — build a new
-# image instead. Everything server-side stays runtime configuration.
-ARG NEXT_PUBLIC_API_BASE_URL=http://localhost:3102
+# image instead. The build fails if any of them is blank or is not a bare origin.
+#
+# BUD_API_ORIGIN is also where server components call the API at runtime; it is
+# carried into the runtime stage below so the two can never disagree.
 ARG NEXT_PUBLIC_COURSES_ORIGIN=http://127.0.0.1:3101
 ARG NEXT_PUBLIC_APP_ORIGIN=http://localhost:3100
-ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL \
-    NEXT_PUBLIC_COURSES_ORIGIN=$NEXT_PUBLIC_COURSES_ORIGIN \
+ARG BUD_API_ORIGIN=http://localhost:3102
+ENV NEXT_PUBLIC_COURSES_ORIGIN=$NEXT_PUBLIC_COURSES_ORIGIN \
     NEXT_PUBLIC_APP_ORIGIN=$NEXT_PUBLIC_APP_ORIGIN \
+    BUD_API_ORIGIN=$BUD_API_ORIGIN \
     NEXT_TELEMETRY_DISABLED=1
 
 RUN npm run build
@@ -40,7 +44,9 @@ RUN npm run build
 FROM node:22-alpine AS runtime
 WORKDIR /app
 
-ENV NODE_ENV=production \
+ARG BUD_API_ORIGIN=http://localhost:3102
+ENV BUD_API_ORIGIN=$BUD_API_ORIGIN \
+    NODE_ENV=production \
     NEXT_TELEMETRY_DISABLED=1 \
     PORT=3100 \
     HOSTNAME=0.0.0.0

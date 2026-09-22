@@ -69,7 +69,15 @@ export default async function CoursePage({ params }: Params) {
           )}
         </div>
 
-        <aside className="lg:sticky lg:top-20 lg:self-start">
+        {/*
+          Sticky, but never taller than the screen. Enrolled, this panel is ~930px —
+          meter, ten sessions, Unenroll — and a sticky element taller than the
+          viewport cannot be scrolled to its end: on a 720px laptop the last sessions
+          and Unenroll were out of reach until the whole outline had scrolled past.
+          Capped, it scrolls on its own instead. The bottom padding is room for
+          Unenroll's focus ring, which a scroll container would otherwise clip.
+        */}
+        <aside className="lg:sticky lg:top-20 lg:max-h-[calc(100dvh-6rem)] lg:self-start lg:overflow-y-auto lg:pb-1">
           <div className="rounded-[var(--radius-panel)] border border-[var(--border)] bg-[var(--card)] p-5">
             <div className="flex items-center gap-4">
               <GrowthMeter

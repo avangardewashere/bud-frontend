@@ -20,7 +20,17 @@ That starts two servers, on purpose:
 
 They must stay on **different hosts**, not just different ports: cookies ignore ports, so `localhost` vs `127.0.0.1` is what keeps course JavaScript away from the session cookie in development. Ports 3100/3101 rather than 3000/3001 because both of those were already in use on the dev machine; override with `COURSES_PORT` and `next dev -p`.
 
-Auth needs a third process, the API from the sibling `Bud - backend` project, on **http://localhost:3102** (`npm run start:dev` there, with its Postgres container up). Its CORS allows `http://localhost:3100` and nothing else — reaching the shell on `127.0.0.1:3100` is a different host, so the preflight fails and the cookie would not match anyway.
+Auth needs a third process, the API from the sibling `Bud - backend` project, on **http://localhost:3102** (`npm run start:dev` there, with its Postgres container up).
+
+**The browser never calls the API directly.** It calls `/api/*` on the shell's own origin, and a rewrite in `next.config.ts` forwards the request to `BUD_API_ORIGIN`. Only the API's own prefixes are forwarded (`auth`, `me`, `courses`, `admin`, `course-spec`, `health`, `ready`), so a new top-level API prefix needs adding there. Development works the same way as production. The reason is the free hosts: the app on `*.vercel.app` and the API on `*.onrender.com` are different *sites*, because both are public suffixes, so the API's `SameSite=Lax` session cookie would never cross between them. Sign-in would appear to work, and then every page would bounce back to `/login`. Through the rewrite, the cookie is first-party on the app's host, which is also where server components read it. Server components skip the detour: they call `BUD_API_ORIGIN` directly and forward the cookie themselves.
+
+| Variable | What | Read |
+|---|---|---|
+| `NEXT_PUBLIC_APP_ORIGIN` | the shell's own origin | build time |
+| `NEXT_PUBLIC_COURSES_ORIGIN` | where course HTML is served. It must differ from the app's origin | build time |
+| `BUD_API_ORIGIN` | where the API really is. Server-only | build time (the rewrite) and runtime (server components) |
+
+All three default to the local ports above. A **production build fails** if any of them is blank or has a path: the first deploy shipped with all three blank, and the only sign was a CSP with no origins in it. On Vercel, set them under *Settings → Environment Variables*, then redeploy.
 
 **http://localhost:3100/brand** is the brand gallery: every piece of artwork at every size the screens use — Bud's three poses, the mark and wordmark, the growth meter across course lengths, and the fallback course cover. It is kept as a living styleguide and is the target for `e2e/brand.spec.ts`.
 
@@ -33,16 +43,21 @@ docker build -t bud-web .
 docker run --rm -p 3100:3100 bud-web
 ```
 
-`NEXT_PUBLIC_*` values are inlined into the client bundle at build time, so they are build arguments rather than runtime environment — an image built for one environment cannot be re-pointed at another by changing env vars. Build a new image instead:
+The three origins are fixed at build time: `NEXT_PUBLIC_*` values are inlined into the client bundle, and `BUD_API_ORIGIN` is compiled into the `/api` rewrite. They are build arguments rather than runtime environment, so an image built for one environment can't be re-pointed at another by changing env vars. Build a new image instead:
 
 ```bash
 docker build -t bud-web \
-  --build-arg NEXT_PUBLIC_API_BASE_URL=https://api.example \
+  --build-arg NEXT_PUBLIC_APP_ORIGIN=https://app.example \
   --build-arg NEXT_PUBLIC_COURSES_ORIGIN=https://courses.example \
-  --build-arg NEXT_PUBLIC_APP_ORIGIN=https://app.example .
+  --build-arg BUD_API_ORIGIN=https://api.example .
 ```
 
 The runtime stage carries Next's `standalone` output rather than `node_modules`, runs as the non-root `node` user, and serves with `node server.js` — `next` itself is not installed in that stage.
+
+Two things differ when the shell serves `/api` itself (the image, `next start`) rather than behind Vercel, whose edge router handles rewrites on its own:
+
+- **The API sees the shell's IP, not the learner's.** Next's rewrite passes on an `X-Forwarded-For` that something in front of it set, and never adds one itself. With nothing in front, every learner shares one per-IP rate-limit bucket, and one person's failed logins can lock an account for everyone. Put a proxy that sets `X-Forwarded-For` in front of the shell. Then point `BUD_API_ORIGIN` at the API's internal address, so a proxy in front of the API doesn't overwrite the header with the shell's address.
+- **Request bodies are capped** at `experimental.proxyClientMaxBodySize`, which is sized from the 50 MB course-archive ceiling in `src/lib/config/limits.ts`. Next's default is 10 MB, which cut uploads off mid-transfer.
 
 ## Checks
 
@@ -75,6 +90,9 @@ Course HTML is author-controlled JavaScript, so most of what keeps a learner's w
 | **No `allow-popups`** | player iframe | A popup is an unpoliced way out: the learner's data rides in a `window.open` URL, or the course hands the bridge port to the popup |
 | **`frame-src`** names only the courses origin | `src/lib/security/csp.ts` | A course can navigate its own frame to `https://evil/?d=…`. Nothing the courses origin sends can stop that; only the embedder's `frame-src` can |
 | **`script-src` with a per-request nonce** and `'strict-dynamic'` | `src/proxy.ts` | No inline or injected script runs unless Next rendered it for this request |
+| **`connect-src 'self'`**: the API is reached only through `/api` | `next.config.ts`, `src/lib/security/csp.ts` | The session cookie stays first-party on the app's host. The API's real address is not in the policy, so a script has one fewer place to send data |
+| **`/api` forwards only the API's own prefixes**, and never a `/{slug}/{version}/…` path | `next.config.ts` | On the free deploy the API's host also serves course content. A catch-all rewrite put course HTML on the shell's origin, top-level and outside the sandbox, with the learner's session a same-origin `fetch` away |
+| **Course documents sandbox themselves**: a CSP `sandbox` with exactly the iframe's flags | the backend's course server, `tools/courses-server.mjs` | A course reached outside the player (opened directly, or through any proxy) still gets an opaque origin. The flags must match the iframe's: looser is a hole, tighter breaks courses in the player |
 
 The CSP is built per request in `src/proxy.ts` from `src/lib/security/csp.ts`, which is where to read the reasoning for each directive. Two consequences worth knowing:
 
@@ -91,6 +109,8 @@ public/bridge.js                     injected into every course HTML entry
 tools/courses-server.mjs             the courses origin, for development
 tools/bridge-leak-probe.mjs          guards the bridge against the exfiltration routes above
 src/proxy.ts                         the per-request nonce and CSP
+src/lib/config/origins.ts            the three origins, and the production build's check of them
+src/lib/config/limits.ts             how large an upload the /api rewrite can carry
 src/lib/security/csp.ts              the policy itself, and why each directive is there
 src/app/                             routes
 e2e/                                 Playwright
