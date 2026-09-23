@@ -57,8 +57,15 @@ test("the shell sends a CSP naming the courses origin", async ({ page }) => {
   const response = await page.goto("/login");
   const csp = response?.headers()["content-security-policy"] ?? "";
 
+  const courses = process.env.NEXT_PUBLIC_COURSES_ORIGIN ?? "http://127.0.0.1:3101";
   expect(csp).toContain("frame-src");
-  expect(csp).toContain(process.env.NEXT_PUBLIC_COURSES_ORIGIN ?? "127.0.0.1:3101");
+  expect(csp).toContain(courses);
+  /**
+   * And images, because a course's cover is served from there too (backend, 24 Sep:
+   * coverUrl resolves against the courses origin). Pinned separately from frame-src so
+   * a tidy-up of one cannot quietly blank every cover in the catalog.
+   */
+  expect(/img-src ([^;]*)/.exec(csp)?.[1] ?? "").toContain(courses);
   // Bud is not embeddable by anyone.
   expect(csp).toContain("frame-ancestors 'none'");
 
