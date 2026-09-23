@@ -76,11 +76,17 @@ test("enrolling shows progress, and the dashboard stops saying nothing is plante
   await page.goto(`/courses/${DOCKER.slug}`);
   await page.getByRole("button", { name: "Start this course" }).click();
 
-  // Enrolled: the meter is at zero of ten and Continue now opens the player.
+  /**
+   * Enrolled: the meter is at zero of ten and the panel's button opens the player.
+   *
+   * Which session it offers is whichever one is next for this learner, not always
+   * the first: progress outlives unenrolling, so hard-coding "Session 1" made this
+   * test depend on what every other spec had left behind.
+   */
   await expect(page.getByText("0 / 10")).toBeVisible();
-  await expect(page.getByRole("link", { name: /Session 1/ })).toHaveAttribute(
+  await expect(page.getByRole("link", { name: /· Session \d+$/ })).toHaveAttribute(
     "href",
-    "/learn/docker-fundamentals/s1",
+    /^\/learn\/docker-fundamentals\/s\d+$/,
   );
   await expect(page.getByRole("button", { name: "Unenroll" })).toBeVisible();
 

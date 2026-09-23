@@ -243,7 +243,11 @@ test("no page in the app violates its own policy", async ({ page }) => {
   await visit("/dashboard");
   await visit("/catalog");
   await visit(`/courses/${SLUG}`);
+  // Renders the learner's own markdown, which the player's notes panel also does.
+  await visit(`/courses/${SLUG}/notes`);
   await openSession(page, SLUG, "s1");
+  await page.getByRole("banner").getByRole("button", { name: /^Notes/ }).click();
+  await page.getByRole("button", { name: "Preview" }).click();
   violations.push(
     ...(await page.evaluate(
       () => (window as unknown as { __cspViolations?: string[] }).__cspViolations ?? [],

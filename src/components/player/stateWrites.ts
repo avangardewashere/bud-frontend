@@ -24,6 +24,8 @@
  * A write's `run` must not itself write to its own key — it would wait on itself.
  */
 
+import { BudApiUnreachableError } from "@/lib/api";
+
 export type StateOp = { kind: "set"; value: string } | { kind: "delete" };
 
 type Settle = { resolve: () => void; reject: (error: unknown) => void };
@@ -139,9 +141,16 @@ export function createStateWrites({ shouldResend, resendDelaysMs }: StateWritesO
       return lane?.pending?.op ?? lane?.inFlight?.op ?? lane?.failed?.job.op;
     },
 
-    /** Writes that failed and have not been re-sent successfully — work only this tab has. */
+    /**
+     * Is there work only this tab has? Anything queued, in flight, or failed and
+     * waiting to be re-sent counts: the honest question is "has the API taken it
+     * yet", not "has it failed yet". Asked before warning on leaving the page, and
+     * before sign-out throws the queue away.
+     */
     hasUnsaved() {
-      for (const lane of lanes.values()) if (lane.failed) return true;
+      for (const lane of lanes.values()) {
+        if (lane.failed || lane.pending || lane.inFlight) return true;
+      }
       return false;
     },
 
@@ -173,3 +182,26 @@ export function createStateWrites({ shouldResend, resendDelaysMs }: StateWritesO
 }
 
 export type StateWrites = ReturnType<typeof createStateWrites>;
+
+/**
+ * The queue this tab actually uses, for everything a learner types into a course:
+ * the bridge's course state (`state:slug/key`) and their own notes (`note:slug/key`).
+ * One queue, because the reason for it — a retried write landing on a newer one — is
+ * the same for both, and because "is anything unsaved?" has to be one answer.
+ *
+ * Module state, so it outlives any single player mount; see the note above about
+ * moving between sessions.
+ */
+export const courseWrites = createStateWrites({
+  // The API away or asleep — worth sending again. A 4xx (quota, not enrolled) is not.
+  shouldResend: (error) => error instanceof BudApiUnreachableError,
+  resendDelaysMs: [30_000, 60_000, 120_000],
+});
+
+export const stateKey = (slug: string, key: string) => `state:${slug}/${key}`;
+export const noteKey = (slug: string, sessionKey: string) => `note:${slug}/${sessionKey}`;
+
+/** On sign-out: nothing queued should go out later under whoever signs in next. */
+export function abandonCourseWrites() {
+  courseWrites.abandon();
+}

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
-import { abandonCourseStateWrites } from "@/components/player/useCourseBridge";
+import { abandonCourseWrites, courseWrites } from "@/components/player/stateWrites";
 import { Button } from "@/components/ui/Button";
 import { budApi } from "@/lib/api";
 
@@ -19,10 +19,22 @@ export function SignOutButton() {
   const [busy, setBusy] = useState(false);
 
   async function signOut() {
+    /**
+     * Work this tab holds and the API has not taken — a note written while the server
+     * was asleep, waiting to be sent again — is dropped by signing out, because it
+     * must not go out later under whoever signs in next. The player promises that
+     * work will save when Bud is back, so this is the one moment that promise is
+     * broken, and it should be broken out loud rather than quietly.
+     */
+    if (courseWrites.hasUnsaved()) {
+      const goOn = window.confirm(
+        "Something you wrote hasn't reached Bud yet — it will be lost if you sign out now. Sign out anyway?",
+      );
+      if (!goOn) return;
+    }
+
     setBusy(true);
-    // Course-state writes still queued or waiting to be re-sent must not go out later
-    // under whoever signs in next.
-    abandonCourseStateWrites();
+    abandonCourseWrites();
     try {
       await budApi.logout();
     } finally {

@@ -31,7 +31,21 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
 
 export default async function LearnPage({ params }: Params) {
   const { slug, sessionKey } = await params;
-  const course = await load(slug);
+
+  /**
+   * The note comes with the page rather than on opening the panel: it decides whether
+   * the Notes button shows its dot, and a learner who opens the panel should find
+   * their note in it, not a spinner. Fetched alongside the course, not after it — two
+   * waits in a row is one too many when the API is waking up. A failure here is not
+   * worth losing the player over (not enrolled, or the note endpoint having a bad
+   * day): the panel opens empty and saving still works.
+   */
+  const [course, note] = await Promise.all([
+    load(slug),
+    budApi
+      .getNote(slug, sessionKey, await serverAuth())
+      .catch(() => null),
+  ]);
 
   const session = course.sessions.find((s) => s.key === sessionKey);
   if (!session) notFound();
@@ -49,5 +63,12 @@ export default async function LearnPage({ params }: Params) {
     course.version,
   )}/${session.entryPath.split("/").map(encodeURIComponent).join("/")}`;
 
-  return <CoursePlayer course={course} session={session} src={src} />;
+  return (
+    <CoursePlayer
+      course={course}
+      session={session}
+      src={src}
+      note={{ bodyMd: note?.bodyMd ?? "", updatedAt: note?.updatedAt ?? null }}
+    />
+  );
 }

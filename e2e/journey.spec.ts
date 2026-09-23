@@ -1,5 +1,5 @@
 import { test, expect } from "@playwright/test";
-import { LEARNER, signIn, skipWithoutApi } from "./support/api";
+import { LEARNER, resetProgress, signIn, skipWithoutApi } from "./support/api";
 
 /**
  * One continuous path through Bud, as a person would actually walk it: arrive
@@ -40,9 +40,27 @@ test("a learner can arrive, start the Docker course and finish a session", async
   await page.getByRole("article").filter({ hasText: "Docker" }).getByRole("link").first().click();
   await expect(page.getByRole("heading", { level: 1 })).toContainText("Docker");
 
-  // Enrol, then open the first session from the course page.
+  /**
+   * Enrol, then open a session from the course page. The panel offers whichever
+   * session is next for this learner — progress survives unenrolling — so the rail
+   * is where this walk picks session 1 deliberately.
+   */
   await page.getByRole("button", { name: "Start this course" }).click();
-  await page.getByRole("link", { name: /Session 1/ }).click();
+  /**
+   * Enrolled again — and now nothing is finished. Progress outlives unenrolling and
+   * the suite shares one learner, so "1 / 10 sessions" below has to be counted from a
+   * known zero rather than from whatever the last run left behind. It needs the
+   * enrolment, which is why it is here rather than at the top.
+   */
+  await resetProgress(page, SLUG);
+  await page.reload();
+
+  await page.getByRole("link", { name: /· Session \d+$/ }).click();
+  await expect(page).toHaveURL(/\/learn\/docker-fundamentals\/s\d+$/);
+  await page
+    .getByRole("navigation")
+    .getByRole("link", { name: "The container mental model" })
+    .click();
   await expect(page).toHaveURL(new RegExp(`/learn/${SLUG}/s1$`));
   // The worksheet's listeners are attached by a script at the end of its document.
   await expect(page.getByText("Opening the session…")).toBeHidden();

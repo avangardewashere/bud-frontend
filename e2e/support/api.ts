@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { budApi } from "@/lib/api";
 
 /**
  * Shared helpers for the specs that need the real API.
@@ -51,6 +52,33 @@ export async function apiReachable(page: Page) {
     }
   }
   return reachable;
+}
+
+/**
+ * The signed-in learner's cookie, as a header — the shape every server-side call
+ * takes, and what lets a spec ask the API directly what it holds.
+ */
+export async function asSignedIn(page: Page) {
+  const cookies = await page.context().cookies();
+  return { headers: { cookie: cookies.map((c) => `${c.name}=${c.value}`).join("; ") } };
+}
+
+/**
+ * Marks every session of a course not-complete again.
+ *
+ * Progress outlives unenrolling, and the suite shares one learner, so a spec that
+ * asserts a count ("1 / 10 sessions") has to say what it is counting from rather than
+ * inherit whatever the last run left behind.
+ */
+export async function resetProgress(page: Page, slug: string) {
+  const auth = await asSignedIn(page);
+  const course = await budApi.getCourse(slug, auth);
+  for (const session of course.sessions) {
+    if (session.status !== "complete") continue;
+    // 403 when the learner is not enrolled: there is nothing to reset from here, and
+    // the caller has to do this while enrolled for it to mean anything.
+    await budApi.uncompleteSession(slug, session.key, auth).catch(() => {});
+  }
 }
 
 export async function skipWithoutApi(page: Page) {

@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Bud } from "@/components/bud";
 import { StatusDot } from "@/components/course/meta";
 import { Button } from "@/components/ui/Button";
 import { BudApiError, budApi, type CourseDetail, type CourseSession } from "@/lib/api";
+import { NotesPanel } from "./NotesPanel";
 import { SavedIndicator } from "./SavedIndicator";
 import { useCourseBridge } from "./useCourseBridge";
+import { useSessionNote, type InitialNote } from "./useSessionNote";
 
 /**
  * The course player — Design-Mockups.md 1g, and 1m on phones.
@@ -22,15 +24,24 @@ export function CoursePlayer({
   course,
   session,
   src,
+  note: initialNote,
 }: {
   course: CourseDetail;
   session: CourseSession;
   src: string;
+  /** The session's note as the page read it, and when the server last changed it. */
+  note: InitialNote;
 }) {
   const router = useRouter();
   const [focus, setFocus] = useState(false);
-  const [railOpen, setRailOpen] = useState(false);
+  /** Phones show one thing at a time down there: the rail, the notes, or neither. */
+  const [sheet, setSheet] = useState<"closed" | "sessions" | "notes">("closed");
+  const [notesOpen, setNotesOpen] = useState(false);
   const [marking, setMarking] = useState(false);
+  // Closing the panel puts focus back where it came from, not at the top of the page.
+  const notesToggle = useRef<HTMLButtonElement>(null);
+
+  const note = useSessionNote({ slug: course.slug, sessionKey: session.key, initial: initialNote });
 
   const { frameRef, save, loaded, slow, onFrameLoad } = useCourseBridge({
     slug: course.slug,
@@ -112,6 +123,32 @@ export function CoursePlayer({
         <span className="font-mono text-sm text-[var(--muted-foreground)]">{percent}%</span>
 
         <Button
+          ref={notesToggle}
+          variant="secondary"
+          onClick={() => {
+            if (notesOpen) note.flush();
+            setNotesOpen((open) => !open);
+          }}
+          className="hidden text-sm md:inline-flex"
+          aria-expanded={notesOpen}
+          aria-controls={notesOpen ? "notes-panel" : undefined}
+        >
+          Notes
+          {/*
+            A dot when there is something written, so the panel need not be opened to
+            find out. role="img" because a bare span maps to `generic`, where a name
+            is dropped — the dot would be silent to a screen reader.
+          */}
+          {note.hasNote && (
+            <span
+              role="img"
+              aria-label="you have notes for this session"
+              className="size-1.5 rounded-full bg-[var(--color-leaf-500)]"
+            />
+          )}
+        </Button>
+
+        <Button
           variant="secondary"
           onClick={() => setFocus((f) => !f)}
           className="hidden text-sm md:inline-flex"
@@ -123,7 +160,14 @@ export function CoursePlayer({
 
       <div className="flex min-h-0 flex-1">
         {!focus && (
-          <nav className="hidden w-[280px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--card)] md:flex">
+          <nav
+            className={
+              "w-[280px] shrink-0 flex-col border-r border-[var(--border)] bg-[var(--card)] " +
+              // With both open, a 1024 laptop left the course narrower than the notes
+              // beside it. The rail is the one to go: the sheet has the same links.
+              (notesOpen ? "hidden xl:flex" : "hidden md:flex")
+            }
+          >
             <p className="px-4 py-3 font-mono text-xs uppercase tracking-wide text-[var(--muted-foreground)]">
               Sessions
             </p>
@@ -188,7 +232,7 @@ export function CoursePlayer({
           </div>
 
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-            <p className="text-sm text-[var(--muted-foreground)]">
+            <p className="hidden text-sm text-[var(--muted-foreground)] sm:block">
               The course suggests completion; Bud records it.
             </p>
             <div className="flex items-center gap-3 md:hidden">
@@ -199,23 +243,61 @@ export function CoursePlayer({
             </Button>
           </div>
         </main>
+
+        {/*
+          Beside the course rather than over it: the ask is in the worksheet, and a
+          note written from memory is a worse note. Phones get it as a sheet below.
+        */}
+        {notesOpen && (
+          <aside
+            id="notes-panel"
+            aria-label="Your notes"
+            className="hidden w-[360px] min-w-0 shrink-0 border-l border-[var(--border)] bg-[var(--card)] p-4 md:flex"
+          >
+            <NotesPanel
+              slug={course.slug}
+              session={session}
+              note={note}
+              onClose={() => {
+                note.flush();
+                setNotesOpen(false);
+                notesToggle.current?.focus();
+              }}
+            />
+          </aside>
+        )}
       </div>
 
-      {/* Phones get the rail as a bottom sheet — mockup 1m. */}
+      {/* Phones get the rail as a bottom sheet — mockup 1m — and the notes beside it. */}
       <div className="border-t border-[var(--border)] bg-[var(--card)] md:hidden">
-        <button
-          type="button"
-          onClick={() => setRailOpen((o) => !o)}
-          aria-expanded={railOpen}
-          className="flex w-full items-center justify-between px-4 py-3"
-        >
-          <span className="font-mono text-xs uppercase tracking-wide text-[var(--muted-foreground)]">
-            Sessions · {done} / {ordered.length}
-          </span>
+        <div className="flex items-center justify-between gap-2 px-2">
+          <div className="flex items-center">
+            <SheetTab
+              open={sheet === "sessions"}
+              onClick={() => setSheet((s) => (s === "sessions" ? "closed" : "sessions"))}
+            >
+              Sessions · {done} / {ordered.length}
+            </SheetTab>
+            <SheetTab
+              open={sheet === "notes"}
+              onClick={() => {
+                if (sheet === "notes") note.flush();
+                setSheet((s) => (s === "notes" ? "closed" : "notes"));
+              }}
+            >
+              Notes
+              {note.hasNote && (
+                <span
+                  aria-label="you have notes for this session"
+                  className="ml-1.5 inline-block size-1.5 rounded-full bg-[var(--color-leaf-500)] align-middle"
+                />
+              )}
+            </SheetTab>
+          </div>
           <SavedIndicator save={save} />
-        </button>
+        </div>
 
-        {railOpen && (
+        {sheet === "sessions" && (
           <>
             <ol className="max-h-64 overflow-auto px-2 pb-2">
               {ordered.map((s) => (
@@ -229,8 +311,47 @@ export function CoursePlayer({
             </div>
           </>
         )}
+
+        {sheet === "notes" && (
+          <section aria-label="Your notes" className="h-[60dvh] min-h-0 px-3 pb-3">
+            <NotesPanel
+              slug={course.slug}
+              session={session}
+              note={note}
+              onClose={() => {
+                note.flush();
+                setSheet("closed");
+              }}
+            />
+          </section>
+        )}
       </div>
     </div>
+  );
+}
+
+/** One of the phone sheet's two tabs: open it, or close it if it is already showing. */
+function SheetTab({
+  open,
+  onClick,
+  children,
+}: {
+  open: boolean;
+  onClick: () => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-expanded={open}
+      className={
+        "px-3 py-3 font-mono text-xs uppercase tracking-wide " +
+        (open ? "text-[var(--foreground)]" : "text-[var(--muted-foreground)]")
+      }
+    >
+      {children}
+    </button>
   );
 }
 

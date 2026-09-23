@@ -8,12 +8,29 @@ import type { SaveState } from "./useCourseBridge";
  * report failure as a small grey message that is easy to miss, and a failed save is
  * the one thing a learner must not miss.
  */
-export function SavedIndicator({ save }: { save: SaveState }) {
+export function SavedIndicator({
+  save,
+  /**
+   * What is being saved, for the cases where two of these are on screen at once: the
+   * player's own (the worksheet's state) and the notes panel's. They look identical,
+   * so without this a learner hearing "Saved" cannot tell which of the two things
+   * they just typed into is safe.
+   */
+  subject,
+}: {
+  save: SaveState;
+  subject?: string;
+}) {
   if (save.status === "idle") return null;
+  const named = (text: string) => (subject ? `${subject}: ${text}` : text);
 
   if (save.status === "error") {
     return (
-      <span role="status" className="flex items-center gap-1.5 text-sm text-[var(--danger)]">
+      <span
+        role="status"
+        aria-label={named(save.message)}
+        className="flex items-center gap-1.5 text-sm text-[var(--danger)]"
+      >
         <span aria-hidden className="size-2 rounded-full bg-[var(--danger)]" />
         {save.message}
       </span>
@@ -23,6 +40,7 @@ export function SavedIndicator({ save }: { save: SaveState }) {
   return (
     <span
       role="status"
+      aria-label={named(save.status === "saving" ? "Saving…" : "Saved")}
       className="flex items-center gap-1.5 text-sm text-[var(--muted-foreground)]"
     >
       <span

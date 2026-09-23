@@ -1,8 +1,8 @@
 # Bud — frontend (`bud-web`)
 
-The Bud shell: accounts, catalog, dashboard, player, admin. Courses run inside it in a sandboxed iframe on a separate origin and report progress through a small `postMessage` bridge.
+The Bud shell: accounts, catalog, dashboard, player, notes, admin. Courses run inside it in a sandboxed iframe on a separate origin and report progress through a small `postMessage` bridge.
 
-This is **v0**: a standalone frontend that works end to end with no backend, by shipping a stub API behind the same HTTP contract the real backend will implement. Planning lives one folder up, in `../Planning/` — start with `Design-Mockups.md` for what the screens look like.
+Planning lives one folder up, in `../Planning/` — start with `Design-Mockups.md` for what the screens look like, and `Roadmap-Status.md` for where the whole project stands.
 
 ## Run it
 
@@ -79,7 +79,7 @@ node tools/bridge-leak-probe.mjs
 On the $0 deploy the API sleeps after 15 idle minutes and takes about a minute to wake. What the shell does about it:
 
 - **Browser calls** show a "waking up" notice once they have waited four seconds. A call that a gateway answered for is retried twice, after 4 and then 12 seconds. Only calls that are safe to repeat are retried.
-- **Course-state writes** stay in order per key, even across sessions. One that finally fails is sent again later, and closing the tab warns until it lands.
+- **Course-state writes and notes** share one queue per tab (`src/components/player/stateWrites.ts`) and stay in order per key, even across sessions. One that finally fails is sent again later; closing the tab warns until it lands, and signing out says what it is about to throw away.
 - **A course whose saved work failed to load** can't save over it.
 - **Server renders** give up after 5 seconds. The error page then checks `/api/ready` itself, and carries on as soon as the API answers.
 
@@ -145,6 +145,8 @@ tools/sleepy-proxy.mjs               an API you can put to sleep, for the cold-s
 src/proxy.ts                         the per-request nonce and CSP
 src/lib/config/origins.ts            the three origins, and the production build's check of them
 src/lib/config/limits.ts             how large an upload the /api rewrite can carry
+src/components/player/stateWrites.ts one write queue per tab: ordering, re-sends, "is anything unsaved?"
+src/lib/safe-href.ts                 the only way a learner's link reaches an href
 src/lib/security/csp.ts              the policy itself, and why each directive is there
 src/app/                             routes
 e2e/                                 Playwright

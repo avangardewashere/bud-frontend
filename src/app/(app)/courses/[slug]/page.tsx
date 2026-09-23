@@ -112,6 +112,15 @@ export default async function CoursePage({ params }: Params) {
                 <EnrollButton slug={course.slug} enrolled={false} />
               )}
             </div>
+
+            {progress && (
+              <Link
+                href={`/courses/${course.slug}/notes`}
+                className="mt-3 block text-center text-sm text-[var(--tint-foreground)] hover:underline"
+              >
+                Your notes
+              </Link>
+            )}
           </div>
 
           <div className="mt-6 overflow-hidden rounded-[var(--radius-panel)] border border-[var(--border)] bg-[var(--card)]">

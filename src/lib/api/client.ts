@@ -102,8 +102,16 @@ const coursePath = (slug: string) => `/me/courses/${encodeURIComponent(slug)}`;
  * forwards the learner's cookie by hand.
  */
 export function apiBaseUrl() {
-  return typeof window === "undefined" ? apiOrigin() : "/api";
+  return typeof window === "undefined" ? apiOrigin() : BROWSER_API_BASE;
 }
+
+/**
+ * What a URL *in the page* must be, wherever it was rendered: a link the browser
+ * follows goes through the rewrite like everything else the browser does, so the
+ * session cookie goes with it. Server-rendered links cannot use apiBaseUrl() — on
+ * the server that is the API's own address, which in production is a different site.
+ */
+const BROWSER_API_BASE = "/api";
 
 /**
  * Callers may pass `headers` and `signal`. Method, body and credentials are set here
@@ -515,7 +523,7 @@ export const budApi = {
    * headings, and the two would drift.
    */
   notesExportUrl(slug: string): string {
-    return `${apiBaseUrl()}${coursePath(slug)}/notes/export`;
+    return `${BROWSER_API_BASE}${coursePath(slug)}/notes/export`;
   },
 
   // ── deliverables ────────────────────────────────────────────────────────────

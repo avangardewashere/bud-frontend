@@ -2,31 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BudApiError, BudApiUnreachableError, BudApiWakingError, budApi } from "@/lib/api";
-import { createStateWrites } from "./stateWrites";
+import { courseWrites, stateKey } from "./stateWrites";
 
-/**
- * Every course-state write in this tab, ordered per key and re-sent if the API was
- * away — see stateWrites.ts. Module state on purpose: one queue for the tab, which
- * outlives any single player mount. Keys are "slug/key"; a slug cannot contain "/",
- * so no two collide.
- */
-const courseStateWrites = createStateWrites({
-  // The API away or asleep — worth sending again. A 4xx (quota, not enrolled) is not.
-  shouldResend: (error) => error instanceof BudApiUnreachableError,
-  resendDelaysMs: [30_000, 60_000, 120_000],
-});
-
-/** On sign-out: nothing queued should go out later under someone else's session. */
-export function abandonCourseStateWrites() {
-  courseStateWrites.abandon();
-}
-
-/**
- * How long the shell will work at a storage.get before answering with an error. It
- * must answer before bridge.js gives up on the call (STORAGE_TIMEOUT_MS there, 180s):
- * a course whose load timed out on its side starts from a blank sheet, and the shell
- * has to know that happened to protect the learner's saved work from it.
- */
 const STATE_LOAD_DEADLINE_MS = 150_000;
 
 const DID_NOT_LOAD =
@@ -123,7 +100,7 @@ export function useCourseBridge({
 
   const describe = useCallback((error: unknown): SaveError => {
     // Already retried by the client by the time it gets here — and a write that
-    // failed this way is kept and sent again shortly (courseStateWrites).
+    // failed this way is kept and sent again shortly (stateWrites.ts).
     if (error instanceof BudApiWakingError) {
       return {
         status: "error",
@@ -174,8 +151,9 @@ export function useCourseBridge({
     const didNotLoad = new Set<string>();
 
     // A write that failed earlier went through on a later re-send.
-    const unsubscribe = courseStateWrites.subscribe(({ key, ok }) => {
-      if (!key.startsWith(`${ctx.current.slug}/`)) return;
+    const unsubscribe = courseWrites.subscribe(({ key, ok }) => {
+      // Only this course's own state — a note's re-send has its own indicator.
+      if (!key.startsWith(`state:${ctx.current.slug}/`)) return;
       setSave(
         ok
           ? { status: "saved" }
@@ -189,7 +167,7 @@ export function useCourseBridge({
 
     // Closing the tab with work only this tab has would lose it without a word.
     function onBeforeUnload(event: BeforeUnloadEvent) {
-      if (courseStateWrites.hasUnsaved()) event.preventDefault();
+      if (courseWrites.hasUnsaved()) event.preventDefault();
     }
     window.addEventListener("beforeunload", onBeforeUnload);
 
@@ -204,17 +182,17 @@ export function useCourseBridge({
       try {
         switch (msg.method) {
           case "storage.get": {
-            const stateKey = String(params.key);
-            const laneKey = `${courseSlug}/${stateKey}`;
+            const storageKey = String(params.key);
+            const laneKey = stateKey(courseSlug, storageKey);
             // A write this tab has not landed yet is newer than anything the server has.
-            const queued = courseStateWrites.latest(laneKey);
+            const queued = courseWrites.latest(laneKey);
             if (queued) {
               didNotLoad.delete(laneKey);
               reply({ value: queued.kind === "set" ? queued.value : null });
               return;
             }
             try {
-              const loaded = await budApi.getState(courseSlug, stateKey, {
+              const loaded = await budApi.getState(courseSlug, storageKey, {
                 signal: AbortSignal.timeout(STATE_LOAD_DEADLINE_MS),
               });
               didNotLoad.delete(laneKey);
@@ -228,13 +206,13 @@ export function useCourseBridge({
           }
           case "storage.set":
           case "storage.delete": {
-            const stateKey = String(params.key);
-            const laneKey = `${courseSlug}/${stateKey}`;
+            const storageKey = String(params.key);
+            const laneKey = stateKey(courseSlug, storageKey);
             if (didNotLoad.has(laneKey)) {
               // The course started blank. Only let it write if there was nothing to lose.
               let saved: string | null;
               try {
-                saved = (await budApi.getState(courseSlug, stateKey)).value;
+                saved = (await budApi.getState(courseSlug, storageKey)).value;
               } catch {
                 saved = "unknown";
               }
@@ -249,12 +227,12 @@ export function useCourseBridge({
             setSave({ status: "saving" });
             if (msg.method === "storage.set") {
               const value = String(params.value);
-              await courseStateWrites.write(laneKey, { kind: "set", value }, async (signal) => {
-                await budApi.putState(courseSlug, stateKey, value, { signal });
+              await courseWrites.write(laneKey, { kind: "set", value }, async (signal) => {
+                await budApi.putState(courseSlug, storageKey, value, { signal });
               });
             } else {
-              await courseStateWrites.write(laneKey, { kind: "delete" }, async (signal) => {
-                await budApi.deleteState(courseSlug, stateKey, { signal });
+              await courseWrites.write(laneKey, { kind: "delete" }, async (signal) => {
+                await budApi.deleteState(courseSlug, storageKey, { signal });
               });
             }
             setSave({ status: "saved" });
