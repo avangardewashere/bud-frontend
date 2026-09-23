@@ -533,7 +533,16 @@ export const budApi = {
     return request<DeliverableList>("GET", `${coursePath(slug)}/deliverables`, undefined, options);
   },
 
-  /** Submit or update one. `submitted: false` retracts it without losing the link. */
+  /**
+   * Submit or update one. `submitted: false` retracts it without losing the link.
+   *
+   * Retried like everything else, with one caveat worth naming: the row itself is an
+   * upsert, but the API also appends a `deliverable.submitted` event to its activity
+   * log, so a retry the API did in fact receive leaves two. That log is counted by day
+   * for the activity calendar, so a duplicate nudges one day's count and nothing else
+   * — which is a better trade than telling someone their hand-in failed when the API
+   * was merely waking up.
+   */
   async saveDeliverable(
     slug: string,
     sessionKey: string,

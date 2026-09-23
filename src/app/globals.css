@@ -129,6 +129,11 @@
   :root:has([data-course-player]) {
     --waking-offset: 9.5rem;
   }
+  /*
+   * With the hand-in panel open there is a form down there too. That one is measured
+   * rather than guessed — the panel sets --waking-offset from its own height
+   * (DeliverablePanel.tsx), because how tall it is depends on what is in it.
+   */
 
   /* Design.md §6 — reduced motion swaps movement for opacity. */
   @media (prefers-reduced-motion: reduce) {

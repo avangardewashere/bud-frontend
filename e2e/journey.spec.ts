@@ -27,10 +27,15 @@ test("a learner can arrive, start the Docker course and finish a session", async
 
   await signIn(page, LEARNER);
 
-  // Start from a clean slate: unenrolled, so the dashboard is the seed state.
+  // Start from a clean slate: unenrolled, so the dashboard is the seed state. Waiting
+  // for the button to change is waiting for the API to have answered — clicking and
+  // walking away leaves the request racing the next page.
   await page.goto(`/courses/${SLUG}`);
   const unenroll = page.getByRole("button", { name: "Unenroll" });
-  if (await unenroll.isVisible().catch(() => false)) await unenroll.click();
+  if (await unenroll.isVisible().catch(() => false)) {
+    await unenroll.click();
+    await expect(page.getByRole("button", { name: "Start this course" })).toBeVisible();
+  }
 
   await page.goto("/dashboard");
   await expect(page.getByRole("heading", { name: "Nothing planted yet." })).toBeVisible();
@@ -46,6 +51,9 @@ test("a learner can arrive, start the Docker course and finish a session", async
    * is where this walk picks session 1 deliberately.
    */
   await page.getByRole("button", { name: "Start this course" }).click();
+  // Enrolled for certain, not merely asked for: everything below this line needs the
+  // enrolment to exist, and the player redirects away from a course you are not in.
+  await expect(page.getByRole("button", { name: "Unenroll" })).toBeVisible();
   /**
    * Enrolled again — and now nothing is finished. Progress outlives unenrolling and
    * the suite shares one learner, so "1 / 10 sessions" below has to be counted from a

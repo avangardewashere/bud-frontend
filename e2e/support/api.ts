@@ -72,7 +72,11 @@ export async function asSignedIn(page: Page) {
  */
 export async function resetProgress(page: Page, slug: string) {
   const auth = await asSignedIn(page);
-  const course = await budApi.getCourse(slug, auth);
+  // Nothing to reset from if the course cannot even be read (unpublished mid-run by
+  // another spec, a session with no cookie): this is a precondition helper, and it
+  // must not be the thing that fails a test about something else.
+  const course = await budApi.getCourse(slug, auth).catch(() => null);
+  if (!course) return;
   for (const session of course.sessions) {
     if (session.status !== "complete") continue;
     // 403 when the learner is not enrolled: there is nothing to reset from here, and

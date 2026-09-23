@@ -6,7 +6,16 @@ import { useEffect, useRef, useState } from "react";
 import { Bud } from "@/components/bud";
 import { StatusDot } from "@/components/course/meta";
 import { Button } from "@/components/ui/Button";
-import { BudApiError, budApi, type CourseDetail, type CourseSession } from "@/lib/api";
+import {
+  BudApiError,
+  BudApiUnreachableError,
+  BudApiWakingError,
+  budApi,
+  type CourseDetail,
+  type CourseSession,
+  type Deliverable,
+} from "@/lib/api";
+import { DeliverablePanel } from "./DeliverablePanel";
 import { NotesPanel } from "./NotesPanel";
 import { SavedIndicator } from "./SavedIndicator";
 import { useCourseBridge } from "./useCourseBridge";
@@ -25,21 +34,33 @@ export function CoursePlayer({
   session,
   src,
   note: initialNote,
+  deliverable: initialDeliverable,
+  deliverableUnknown = false,
 }: {
   course: CourseDetail;
   session: CourseSession;
   src: string;
   /** The session's note as the page read it, and when the server last changed it. */
   note: InitialNote;
+  /** What has been handed in for this session, or null. Null too when it asks for nothing. */
+  deliverable: Deliverable | null;
+  /** True when the page could not read them at all, so null means "unknown". */
+  deliverableUnknown?: boolean;
 }) {
   const router = useRouter();
   const [focus, setFocus] = useState(false);
   /** Phones show one thing at a time down there: the rail, the notes, or neither. */
   const [sheet, setSheet] = useState<"closed" | "sessions" | "notes">("closed");
   const [notesOpen, setNotesOpen] = useState(false);
+  /** Closed, opened on purpose, or opened by Bud when a session was finished. */
+  const [handIn, setHandIn] = useState<null | "opened" | "offered">(null);
+  /** Only for the toggle's dot; the panel below owns the deliverable itself. */
+  const [handedIn, setHandedIn] = useState(initialDeliverable?.submittedAt != null);
   const [marking, setMarking] = useState(false);
-  // Closing the panel puts focus back where it came from, not at the top of the page.
+  const [markError, setMarkError] = useState<string | null>(null);
+  // Closing a panel puts focus back where it came from, not at the top of the page.
   const notesToggle = useRef<HTMLButtonElement>(null);
+  const handInToggle = useRef<HTMLButtonElement>(null);
 
   const note = useSessionNote({ slug: course.slug, sessionKey: session.key, initial: initialNote });
 
@@ -69,12 +90,28 @@ export function CoursePlayer({
 
   async function toggleComplete() {
     setMarking(true);
+    setMarkError(null);
     try {
       if (complete) await budApi.uncompleteSession(course.slug, session.key);
-      else await budApi.completeSession(course.slug, session.key);
+      else {
+        await budApi.completeSession(course.slug, session.key);
+        // Finishing a session that asked for something is the moment to hand it in —
+        // and the dashboard is about to list it as waiting. Opening the panel here
+        // saves a hunt for the button; nothing is submitted without pressing it.
+        if (session.deliverable && !handedIn) setHandIn("offered");
+      }
       router.refresh();
     } catch (error) {
-      if (!(error instanceof BudApiError)) throw error;
+      /**
+       * A press that did nothing has to say so. An unreachable or waking API used to
+       * leave this as an unhandled rejection: the button came back to life unchanged
+       * and the learner was left pressing it again, wondering which of the two of them
+       * was broken.
+       */
+      setMarkError(whyNotMarked(error));
+      if (!(error instanceof BudApiError) && !(error instanceof BudApiUnreachableError)) {
+        throw error;
+      }
     } finally {
       setMarking(false);
     }
@@ -82,6 +119,7 @@ export function CoursePlayer({
 
   return (
     // data-course-player lets the waking notice clear this screen's bottom controls.
+    // (With the hand-in panel open, the panel measures itself and moves it further.)
     <div className="flex h-dvh flex-col" data-course-player>
       <header className="flex h-14 shrink-0 items-center gap-3 border-b border-[var(--border)] bg-[var(--card)] px-4">
         <Link
@@ -231,16 +269,70 @@ export function CoursePlayer({
             />
           </div>
 
+          {/*
+            Under the frame rather than in a drawer: handing in is the last thing you
+            do in a session, it belongs beside Mark complete, and the ask above the
+            field is the manifest's own words (mockup 1g's caption row).
+          */}
+          {session.deliverable && handIn && (
+            <DeliverablePanel
+              slug={course.slug}
+              session={session}
+              initial={initialDeliverable}
+              unknown={deliverableUnknown}
+              autoFocus={handIn === "opened"}
+              onChanged={(next) => {
+                setHandedIn(next?.submittedAt != null);
+                router.refresh();
+              }}
+              onClose={() => {
+                setHandIn(null);
+                handInToggle.current?.focus();
+              }}
+            />
+          )}
+
           <div className="flex shrink-0 flex-wrap items-center justify-between gap-3">
-            <p className="hidden text-sm text-[var(--muted-foreground)] sm:block">
-              The course suggests completion; Bud records it.
-            </p>
-            <div className="flex items-center gap-3 md:hidden">
-              <SavedIndicator save={save} />
+            {markError ? (
+              <p role="alert" className="text-sm text-[var(--danger)]">
+                {markError}
+              </p>
+            ) : (
+              <p className="hidden text-sm text-[var(--muted-foreground)] sm:block">
+                The course suggests completion; Bud records it.
+              </p>
+            )}
+            <div className="flex flex-wrap items-center gap-3">
+              <span className="md:hidden">
+                <SavedIndicator save={save} />
+              </span>
+              {session.deliverable && (
+                <Button
+                  ref={handInToggle}
+                  variant="secondary"
+                  onClick={() => {
+                    // On a phone the sheet and this panel want the same half of the
+                    // screen, and with both open the course itself is what gives way.
+                    setSheet("closed");
+                    setHandIn((open) => (open ? null : "opened"));
+                  }}
+                  aria-expanded={handIn !== null}
+                  aria-controls={handIn ? "hand-in-panel" : undefined}
+                >
+                  Hand in
+                  {handedIn && (
+                    <span
+                      role="img"
+                      aria-label="you have handed this in"
+                      className="size-1.5 rounded-full bg-[var(--color-leaf-500)]"
+                    />
+                  )}
+                </Button>
+              )}
+              <Button variant="secondary" onClick={toggleComplete} disabled={marking}>
+                {complete ? "Mark not complete" : "Mark complete"}
+              </Button>
             </div>
-            <Button variant="secondary" onClick={toggleComplete} disabled={marking}>
-              {complete ? "Mark not complete" : "Mark complete"}
-            </Button>
           </div>
         </main>
 
@@ -287,7 +379,10 @@ export function CoursePlayer({
             >
               Notes
               {note.hasNote && (
+                // role="img", as on the desktop toggle: a bare span maps to `generic`,
+                // where the name is dropped and the dot says nothing at all.
                 <span
+                  role="img"
                   aria-label="you have notes for this session"
                   className="ml-1.5 inline-block size-1.5 rounded-full bg-[var(--color-leaf-500)] align-middle"
                 />
@@ -328,6 +423,23 @@ export function CoursePlayer({
       </div>
     </div>
   );
+}
+
+/** Design.md §8: what happened, and whether anything was recorded. */
+function whyNotMarked(error: unknown): string {
+  if (error instanceof BudApiWakingError) {
+    return "Bud's server is waking up. Nothing was recorded — try again in a moment.";
+  }
+  if (error instanceof BudApiUnreachableError) {
+    return "Can't reach Bud. Nothing was recorded — try again in a moment.";
+  }
+  if (error instanceof BudApiError) {
+    if (error.code === "not_enrolled") return "You're not enrolled in this course.";
+    if (error.statusCode === 429) return "Too many tries just now. Give it a moment.";
+    if (error.isUnauthorized) return "You've been signed out. Sign in again to record this.";
+    return "Bud couldn't record that just now.";
+  }
+  return "Bud couldn't record that just now.";
 }
 
 /** One of the phone sheet's two tabs: open it, or close it if it is already showing. */

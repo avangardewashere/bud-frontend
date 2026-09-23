@@ -1,7 +1,7 @@
 import type { Metadata } from "next";
 import { notFound, redirect } from "next/navigation";
 import { CoursePlayer } from "@/components/player/CoursePlayer";
-import { BudApiError, budApi, type CourseDetail } from "@/lib/api";
+import { BudApiError, budApi, type CourseDetail, type DeliverableList } from "@/lib/api";
 import { serverAuth } from "@/lib/api/session";
 import { coursesOrigin } from "@/lib/config/origins";
 
@@ -40,11 +40,24 @@ export default async function LearnPage({ params }: Params) {
    * worth losing the player over (not enrolled, or the note endpoint having a bad
    * day): the panel opens empty and saving still works.
    */
-  const [course, note] = await Promise.all([
+  const auth = await serverAuth();
+  const [course, note, deliverables] = await Promise.all([
     load(slug),
-    budApi
-      .getNote(slug, sessionKey, await serverAuth())
-      .catch(() => null),
+    budApi.getNote(slug, sessionKey, auth).catch(() => null),
+    /**
+     * Whatever has been handed in for this course. There is no endpoint for one
+     * session's deliverable — the list is small (one row per session at most), and a
+     * third wait in the same breath would cost more than the rows do.
+     *
+     * A failure is carried rather than flattened: "nothing handed in" and "Bud could
+     * not find out" look identical as an empty list, and the difference matters — the
+     * second one, shown as the first, invites a learner to replace a link this page
+     * never saw. The player says so instead.
+     */
+    budApi.listDeliverables(slug, auth).then(
+      (list) => ({ list, unknown: false }),
+      () => ({ list: [] as DeliverableList, unknown: true }),
+    ),
   ]);
 
   const session = course.sessions.find((s) => s.key === sessionKey);
@@ -69,6 +82,8 @@ export default async function LearnPage({ params }: Params) {
       session={session}
       src={src}
       note={{ bodyMd: note?.bodyMd ?? "", updatedAt: note?.updatedAt ?? null }}
+      deliverable={deliverables.list.find((d) => d.sessionKey === sessionKey) ?? null}
+      deliverableUnknown={deliverables.unknown}
     />
   );
 }

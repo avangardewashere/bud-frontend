@@ -37,7 +37,12 @@ export async function generateMetadata({ params }: Params): Promise<Metadata> {
  */
 export default async function CoursePage({ params }: Params) {
   const { slug } = await params;
-  const course = await load(slug);
+  // Deliverables are a learner's own, so the API answers 403 to anyone not enrolled:
+  // an empty list, not a broken page. Fetched beside the course rather than after it.
+  const [course, deliverables] = await Promise.all([
+    load(slug),
+    budApi.listDeliverables(slug, await serverAuth()).catch(() => []),
+  ]);
   const progress = course.enrollment;
 
   return (
@@ -127,7 +132,7 @@ export default async function CoursePage({ params }: Params) {
             <h2 className="border-b border-[var(--border)] px-3 py-2.5 font-mono text-xs uppercase tracking-wide text-[var(--muted-foreground)]">
               Sessions
             </h2>
-            <SessionList sessions={course.sessions} />
+            <SessionList sessions={course.sessions} deliverables={deliverables} />
           </div>
 
           {progress && (

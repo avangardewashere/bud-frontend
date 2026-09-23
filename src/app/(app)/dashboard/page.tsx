@@ -3,6 +3,8 @@ import Link from "next/link";
 import { Bud } from "@/components/bud";
 import { ContinueCard } from "@/components/course/ContinueCard";
 import { CourseCard } from "@/components/course/CourseCard";
+import { RecentNotes } from "@/components/dashboard/RecentNotes";
+import { WaitingToHandIn } from "@/components/dashboard/WaitingToHandIn";
 import { ButtonLink } from "@/components/ui/Button";
 import { budApi, type Dashboard } from "@/lib/api";
 import { getSessionUser, serverAuth } from "@/lib/api/session";
@@ -91,6 +93,10 @@ export default async function DashboardPage() {
           </div>
         </section>
       )}
+
+      {/* Both disappear when they have nothing to say (§5.5, Phase 2). */}
+      <WaitingToHandIn items={dashboard.upcomingDeliverables} />
+      <RecentNotes notes={dashboard.recentNotes} />
     </main>
   );
 }

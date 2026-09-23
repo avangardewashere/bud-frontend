@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState, useTransition } from "react";
 import { abandonCourseWrites, courseWrites } from "@/components/player/stateWrites";
+import { forgetTabMemory } from "@/components/player/tabMemory";
 import { Button } from "@/components/ui/Button";
 import { budApi } from "@/lib/api";
 
@@ -35,6 +36,10 @@ export function SignOutButton() {
 
     setBusy(true);
     abandonCourseWrites();
+    // And what the panels remember on their own — a note, a link typed but not handed
+    // in — goes with it. It belongs to whoever is signing out, not to the next person
+    // to use this browser.
+    forgetTabMemory();
     try {
       await budApi.logout();
     } finally {

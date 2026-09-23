@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BudApiError, BudApiUnreachableError, BudApiWakingError, budApi } from "@/lib/api";
 import { courseWrites, noteKey } from "./stateWrites";
+import { tabMemory } from "./tabMemory";
 import type { SaveState } from "./useCourseBridge";
 
 /**
@@ -36,7 +37,7 @@ const AUTOSAVE_AFTER_MS = 800;
  * the next keystroke saves the empty box over it. This is the tab's own memory, which
  * outlives any single mount, and it wins whenever it is the more recent of the two.
  */
-const lastKnown = new Map<string, { value: string; at: number }>();
+const lastKnown = tabMemory<{ value: string; at: number }>();
 
 function remember(lane: string, value: string, at: number) {
   const known = lastKnown.get(lane);
