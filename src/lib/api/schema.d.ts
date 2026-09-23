@@ -406,6 +406,109 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/courses/{slug}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every note for a course, in session order
+         * @description Sessions with no note are omitted rather than returned empty.
+         */
+        get: operations["NotesController_list"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/courses/{slug}/notes/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Every note as one markdown file
+         * @description Assembled here rather than in the shell: the ordering and the headings are the same decisions the list endpoint makes, and two implementations would drift.
+         */
+        get: operations["NotesController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/courses/{slug}/sessions/{key}/notes": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The note for one session */
+        get: operations["NotesController_get"];
+        /**
+         * Write the note for one session
+         * @description Whole value, like the bridge. An empty body deletes the note.
+         */
+        put: operations["NotesController_save"];
+        post?: never;
+        /** Delete the note for one session */
+        delete: operations["NotesController_remove"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/courses/{slug}/deliverables": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * What the learner has submitted for this course
+         * @description No grading — "submitted" is the learner’s own claim.
+         */
+        get: operations["NotesController_listDeliverables"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/courses/{slug}/sessions/{key}/deliverable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Submit or update a deliverable
+         * @description Pass submitted:false to retract without losing the link.
+         */
+        put: operations["NotesController_saveDeliverable"];
+        post?: never;
+        /** Remove a deliverable entirely */
+        delete: operations["NotesController_removeDeliverable"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -714,6 +817,23 @@ export interface components {
                 /** Format: date-time */
                 completedAt: string | null;
             }[];
+            recentNotes: {
+                slug: string;
+                courseTitle: string;
+                sessionKey: string;
+                sessionTitle: string | null;
+                excerpt: string;
+                /** Format: date-time */
+                updatedAt: string;
+            }[];
+            upcomingDeliverables: {
+                slug: string;
+                courseTitle: string;
+                sessionKey: string;
+                sessionTitle: string;
+                asked: string;
+                sessionComplete: boolean;
+            }[];
             totals: {
                 enrolledCourses: number;
                 completedCourses: number;
@@ -721,6 +841,44 @@ export interface components {
                 totalSessions: number;
             };
         };
+        Note: {
+            sessionKey: string;
+            sessionTitle: string | null;
+            sessionOrder: number | null;
+            bodyMd: string;
+            /** Format: date-time */
+            updatedAt: string;
+        } | null;
+        NoteList: {
+            sessionKey: string;
+            sessionTitle: string | null;
+            sessionOrder: number | null;
+            bodyMd: string;
+            /** Format: date-time */
+            updatedAt: string;
+        }[];
+        Deliverable: {
+            sessionKey: string;
+            sessionTitle: string | null;
+            asked: string | null;
+            url: string;
+            comment: string | null;
+            /** Format: date-time */
+            submittedAt: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        DeliverableList: {
+            sessionKey: string;
+            sessionTitle: string | null;
+            asked: string | null;
+            url: string;
+            comment: string | null;
+            /** Format: date-time */
+            submittedAt: string | null;
+            /** Format: date-time */
+            updatedAt: string;
+        }[];
     };
     responses: never;
     parameters: never;
@@ -1431,6 +1589,214 @@ export interface operations {
                 content: {
                     "application/json": components["schemas"]["SessionProgress"];
                 };
+            };
+        };
+    };
+    NotesController_list: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The notes. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["NoteList"];
+                };
+            };
+            /** @description Not enrolled. */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    NotesController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A markdown document. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotesController_get: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The note, or null when there is none. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Note"];
+                };
+            };
+            /** @description unknown_session. */
+            404: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    NotesController_save: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    bodyMd: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The saved note, or null if it was cleared. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Note"];
+                };
+            };
+        };
+    };
+    NotesController_remove: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gone. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    NotesController_listDeliverables: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The deliverables. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["DeliverableList"];
+                };
+            };
+        };
+    };
+    NotesController_saveDeliverable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** Format: uri */
+                    url: string;
+                    comment?: string;
+                    submitted?: boolean;
+                };
+            };
+        };
+        responses: {
+            /** @description The deliverable. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Deliverable"];
+                };
+            };
+        };
+    };
+    NotesController_removeDeliverable: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                slug: string;
+                key: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Gone. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
             };
         };
     };

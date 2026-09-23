@@ -109,6 +109,8 @@ npm run api:types
 
 The backend publishes the spec at `http://localhost:3102/docs/openapi.json` (Swagger UI at `/docs`) and is the single source of truth for it — the frontend never hand-writes a request or response shape. Everything else in `src/lib/api/` is a thin layer over that: `credentials: "include"` on every call, since the session is an httpOnly cookie, and non-2xx responses turned into a `BudApiError` carrying the API's error envelope.
 
+`e2e/api-client.spec.ts` runs that client from Node against the real API, with a session cookie forwarded by hand — the same way server components call it. It's what keeps the client honest for endpoints no screen uses yet.
+
 ## Security
 
 Course HTML is author-controlled JavaScript, so most of what keeps a learner's work safe is about what a course *cannot* do. Each rule below was found by trying to break it, and each has a test.
@@ -123,6 +125,7 @@ Course HTML is author-controlled JavaScript, so most of what keeps a learner's w
 | **`connect-src 'self'`**: the API is reached only through `/api` | `next.config.ts`, `src/lib/security/csp.ts` | The session cookie stays first-party on the app's host. The API's real address is not in the policy, so a script has one fewer place to send data |
 | **`/api` forwards only the API's own prefixes**, and never a `/{slug}/{version}/…` path | `next.config.ts` | On the free deploy the API's host also serves course content. A catch-all rewrite put course HTML on the shell's origin, top-level and outside the sandbox, with the learner's session a same-origin `fetch` away |
 | **Course documents sandbox themselves**: a CSP `sandbox` with exactly the iframe's flags | the backend's course server, `tools/courses-server.mjs` | A course reached outside the player (opened directly, or through any proxy) still gets an opaque origin. The flags must match the iframe's: looser is a hole, tighter breaks courses in the player |
+| **Learner-supplied links are parsed before they reach an `href`** | `src/lib/safe-href.ts` | A deliverable is a URL someone typed. `javascript:` in an href runs in the shell's own origin when clicked. The API refuses anything but http(s) on the way in; this refuses it on the way out, for values that predate a validator or come from an endpoint written later |
 
 The CSP is built per request in `src/proxy.ts` from `src/lib/security/csp.ts`, which is where to read the reasoning for each directive. Two consequences worth knowing:
 

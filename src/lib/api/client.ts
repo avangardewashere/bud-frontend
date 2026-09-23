@@ -50,6 +50,12 @@ export type IngestResult = components["schemas"]["IngestResult"];
 export type ValidationResult = components["schemas"]["ValidationResult"];
 export type CourseStorageKeys = components["schemas"]["CourseStorageKeys"];
 export type CourseStatus = AdminCourse["status"];
+export type AuthProviders = components["schemas"]["AuthProviders"];
+/** A session's note. `null` when there is none — the API omits empty notes rather than storing them. */
+export type Note = components["schemas"]["Note"];
+export type NoteList = components["schemas"]["NoteList"];
+export type Deliverable = components["schemas"]["Deliverable"];
+export type DeliverableList = components["schemas"]["DeliverableList"];
 
 /** The package rules, served by the API so the panel and the validator agree. */
 export type CourseSpecInfo = {
@@ -72,6 +78,8 @@ type JsonBody<O extends keyof operations> = operations[O] extends {
   : never;
 
 export type LoginBody = JsonBody<"AuthController_login">;
+export type SaveNoteBody = JsonBody<"NotesController_save">;
+export type SaveDeliverableBody = JsonBody<"NotesController_saveDeliverable">;
 export type RegisterBody = JsonBody<"AuthController_register">;
 export type ChangePasswordBody = JsonBody<"AuthController_changePassword">;
 
@@ -80,6 +88,8 @@ const statePath = (slug: string, key: string) =>
 
 const sessionPath = (slug: string, sessionKey: string) =>
   `/me/courses/${encodeURIComponent(slug)}/sessions/${encodeURIComponent(sessionKey)}`;
+
+const coursePath = (slug: string) => `/me/courses/${encodeURIComponent(slug)}`;
 
 /**
  * The browser always calls /api on the shell's own origin, which the rewrite in
@@ -455,6 +465,87 @@ export const budApi = {
       undefined,
       options,
     );
+  },
+
+  /**
+   * Which sign-in options this deployment offers, so the shell renders the GitHub
+   * button and a sign-up link only when they lead somewhere.
+   */
+  async providers(options?: RequestOptions): Promise<AuthProviders> {
+    return request<AuthProviders>("GET", "/auth/providers", undefined, options);
+  },
+
+  // ── notes ───────────────────────────────────────────────────────────────────
+  // What the course asked the learner to write. Every Docker session asks for a
+  // notes.md entry, and these are where it lives (Overall Plan §5.7).
+
+  /** Every note for a course, in session order. Sessions with no note are omitted. */
+  async listNotes(slug: string, options?: RequestOptions): Promise<NoteList> {
+    return request<NoteList>("GET", `${coursePath(slug)}/notes`, undefined, options);
+  },
+
+  /** One session's note, or null when it has none. */
+  async getNote(slug: string, sessionKey: string, options?: RequestOptions): Promise<Note> {
+    return request<Note>("GET", `${sessionPath(slug, sessionKey)}/notes`, undefined, options);
+  },
+
+  /**
+   * Write a session's note. Whole value, like the bridge — and an empty body deletes
+   * it, which is the API's own rule rather than a shortcut taken here.
+   */
+  async saveNote(
+    slug: string,
+    sessionKey: string,
+    bodyMd: string,
+    options?: RequestOptions,
+  ): Promise<Note> {
+    return request<Note>("PUT", `${sessionPath(slug, sessionKey)}/notes`, { bodyMd }, options);
+  },
+
+  async deleteNote(slug: string, sessionKey: string, options?: RequestOptions): Promise<void> {
+    await request<void>("DELETE", `${sessionPath(slug, sessionKey)}/notes`, undefined, options);
+  },
+
+  /**
+   * Where the browser downloads every note as one markdown file.
+   *
+   * A plain link, not a fetch: it is same-origin through the rewrite, so the session
+   * cookie goes with it, and the API's Content-Disposition names the file. Building
+   * the document here would be a second implementation of the API's ordering and
+   * headings, and the two would drift.
+   */
+  notesExportUrl(slug: string): string {
+    return `${apiBaseUrl()}${coursePath(slug)}/notes/export`;
+  },
+
+  // ── deliverables ────────────────────────────────────────────────────────────
+  // A link to what the learner produced. No grading: "submitted" is their own claim.
+
+  async listDeliverables(slug: string, options?: RequestOptions): Promise<DeliverableList> {
+    return request<DeliverableList>("GET", `${coursePath(slug)}/deliverables`, undefined, options);
+  },
+
+  /** Submit or update one. `submitted: false` retracts it without losing the link. */
+  async saveDeliverable(
+    slug: string,
+    sessionKey: string,
+    body: SaveDeliverableBody,
+    options?: RequestOptions,
+  ): Promise<Deliverable> {
+    return request<Deliverable>(
+      "PUT",
+      `${sessionPath(slug, sessionKey)}/deliverable`,
+      body,
+      options,
+    );
+  },
+
+  async deleteDeliverable(
+    slug: string,
+    sessionKey: string,
+    options?: RequestOptions,
+  ): Promise<void> {
+    await request<void>("DELETE", `${sessionPath(slug, sessionKey)}/deliverable`, undefined, options);
   },
 
   /** The package rules: limits, allowed extensions and the manifest JSON Schema. */
