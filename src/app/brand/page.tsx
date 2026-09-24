@@ -76,16 +76,39 @@ export default function BrandPage() {
         </Swatch>
       </Section>
 
-      <Section title="Poses" note="Bloom on course completion; seed for empty states.">
+      <Section
+        title="Poses"
+        note="Design.md §3's mood table. Which one a screen shows is decided in src/lib/bud/mood.ts, never in the screen."
+      >
+        <Swatch label="seed">
+          <Bud pose="seed" size={110} />
+        </Swatch>
+        <Swatch label="sprout">
+          <Bud pose="sprout" size={110} />
+        </Swatch>
         <Swatch label="default">
           <Bud size={110} />
         </Swatch>
         <Swatch label="bloom">
           <Bud pose="bloom" size={110} />
         </Swatch>
-        <Swatch label="seed">
-          <Bud pose="seed" size={110} />
+        <Swatch label="thirsty">
+          <Bud pose="thirsty" size={110} />
         </Swatch>
+        <Swatch label="sleepy">
+          <Bud pose="sleepy" size={110} />
+        </Swatch>
+      </Section>
+
+      <Section
+        title="Poses at 24px"
+        note="The player's top bar. Below 32px the belly, mouth and root-toes go; the mood has to survive that."
+      >
+        {(["sprout", "default", "bloom", "thirsty", "sleepy"] as const).map((pose) => (
+          <Swatch key={pose} label={`24 — ${pose}`}>
+            <Bud pose={pose} size={24} />
+          </Swatch>
+        ))}
       </Section>
 
       <Section

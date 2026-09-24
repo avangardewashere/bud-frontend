@@ -1,5 +1,7 @@
 import { test, expect } from "@playwright/test";
-import { ADMIN, LEARNER, signIn, skipWithoutApi } from "./support/api";
+import { canPublish } from "@/lib/admin/publishable";
+import { budApi } from "@/lib/api";
+import { ADMIN, LEARNER, asSignedIn, signIn, skipWithoutApi } from "./support/api";
 
 /**
  * Block 9 — admin course management, mockup 1h.
@@ -109,6 +111,32 @@ test("an archive past Next's default 10MB body limit still reaches the API whole
     "application/json",
   );
   await expect(page.getByTestId("validation-results")).toBeVisible();
+});
+
+/**
+ * The screen has to agree with the rule, not with a second copy of it.
+ *
+ * Publish was wired to `currentVersion !== null` — the version the catalog serves,
+ * which a freshly uploaded course does not have, because publishing is what gives it
+ * one. So upload → validate → Publish was a dead button for every course except the
+ * one that had already been published before the button existed, which is why nothing
+ * caught it. canPublish asks the question that matters: was a package ever accepted?
+ */
+test("Publish is offered for exactly the courses that have a package", async ({ page }) => {
+  await signIn(page, ADMIN);
+  const { courses } = await budApi.adminCourses(await asSignedIn(page));
+  expect(courses.length, "this proves nothing with an empty table").toBeGreaterThan(0);
+
+  await page.goto("/admin/courses");
+  for (const course of courses) {
+    const row = page.getByRole("row").filter({ hasText: course.slug });
+    const button = row.getByRole("button", { name: /^(Publish|Unpublish)$/ });
+    if (canPublish(course)) {
+      await expect(button, `${course.slug} has ${course.versionCount} version(s)`).toBeEnabled();
+    } else {
+      await expect(button, `${course.slug} has no package yet`).toBeDisabled();
+    }
+  }
 });
 
 test("publishing and unpublishing round-trips", async ({ page }) => {

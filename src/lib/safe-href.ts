@@ -1,3 +1,5 @@
+import { coursesOrigin } from "@/lib/config/origins";
+
 /**
  * A learner-supplied URL that is safe to put in an `href`, or null.
  *
@@ -27,6 +29,23 @@ export function safeHref(url: string | null | undefined): string | null {
     return null;
   }
   return parsed.protocol === "http:" || parsed.protocol === "https:" ? parsed.href : null;
+}
+
+/**
+ * A course's cover image, or null.
+ *
+ * The API builds this URL from the published version's storage key, so it is not
+ * learner-supplied — but it is course-supplied, and it ends up in an `<img src>` that
+ * the browser fetches with the learner's address and referrer. So it has to be on the
+ * courses origin, which is where covers live and the only host the shell's CSP allows
+ * images from anyway (`img-src`, src/lib/security/csp.ts). Anything else is refused
+ * here rather than left for the browser to block silently, and the card draws its
+ * fallback instead.
+ */
+export function coverSrc(url: string | null | undefined): string | null {
+  const safe = safeHref(url);
+  if (!safe) return null;
+  return new URL(safe).origin === coursesOrigin() ? safe : null;
 }
 
 /** "https://github.com/ari/bud" → "github.com/ari/bud", for showing a link compactly. */

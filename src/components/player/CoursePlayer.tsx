@@ -15,6 +15,7 @@ import {
   type CourseSession,
   type Deliverable,
 } from "@/lib/api";
+import { poseForCourse } from "@/lib/bud/mood";
 import { DeliverablePanel } from "./DeliverablePanel";
 import { NotesPanel } from "./NotesPanel";
 import { SavedIndicator } from "./SavedIndicator";
@@ -58,6 +59,9 @@ export function CoursePlayer({
   const [handedIn, setHandedIn] = useState(initialDeliverable?.submittedAt != null);
   const [marking, setMarking] = useState(false);
   const [markError, setMarkError] = useState<string | null>(null);
+  /** The bloom, for the moment after a session is finished (Design.md §3 and §6). */
+  const [blooming, setBlooming] = useState(false);
+  const bloomTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Closing a panel puts focus back where it came from, not at the top of the page.
   const notesToggle = useRef<HTMLButtonElement>(null);
   const handInToggle = useRef<HTMLButtonElement>(null);
@@ -88,6 +92,21 @@ export function CoursePlayer({
   const percent = Math.round((done / ordered.length) * 100);
   const complete = session.status === "complete";
 
+  /**
+   * Open the flower, then let it close again — §3: "for a moment". It outlasts the
+   * 900ms animation so the moment is seen rather than glimpsed, and the timer is held
+   * so leaving the session mid-bloom does not set state on a gone component.
+   */
+  function bloom() {
+    if (bloomTimer.current) clearTimeout(bloomTimer.current);
+    setBlooming(true);
+    bloomTimer.current = setTimeout(() => setBlooming(false), 1600);
+  }
+
+  useEffect(() => () => {
+    if (bloomTimer.current) clearTimeout(bloomTimer.current);
+  }, []);
+
   async function toggleComplete() {
     setMarking(true);
     setMarkError(null);
@@ -95,6 +114,7 @@ export function CoursePlayer({
       if (complete) await budApi.uncompleteSession(course.slug, session.key);
       else {
         await budApi.completeSession(course.slug, session.key);
+        bloom();
         // Finishing a session that asked for something is the moment to hand it in —
         // and the dashboard is about to list it as waiting. Opening the panel here
         // saves a hunt for the button; nothing is submitted without pressing it.
@@ -130,7 +150,18 @@ export function CoursePlayer({
           ‹
         </Link>
 
-        <Bud size={24} label={null} className="hidden sm:block" />
+        {/*
+          Design.md §3: the player's Bud is "mood only". It blooms for a moment when a
+          session is finished — the one animation in the app — and stays open once the
+          whole course is.
+        */}
+        <Bud
+          size={24}
+          pose={blooming ? "bloom" : poseForCourse({ completed: done, total: ordered.length })}
+          animate={blooming}
+          label={null}
+          className="hidden sm:block"
+        />
 
         <div className="min-w-0 flex-1">
           <span className="hidden truncate font-semibold sm:inline">{course.title}</span>

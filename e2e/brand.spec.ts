@@ -30,6 +30,58 @@ test("every illustration has an accessible name", async ({ page }) => {
   ).toBeVisible();
 });
 
+test("every mood in Design.md §3 is drawn, and says which it is", async ({ page }) => {
+  for (const [pose, name] of [
+    ["seed", "A seed, not yet sprouted"],
+    ["sprout", "Bud, just sprouted"],
+    ["default", "Bud"],
+    ["bloom", "Bud, in bloom"],
+    ["thirsty", "Bud, a little thirsty"],
+    ["sleepy", "Bud, dozing"],
+  ] as const) {
+    await expect(page.getByRole("img", { name, exact: true }).first()).toBeVisible();
+    // The caption exactly: "sprout" as a substring also finds the wordmark's
+    // "32, sprouting u", which is a different piece of artwork entirely.
+    const figure = page.locator("figure").filter({ hasText: new RegExp(`^${pose}$`) });
+    await expect(figure.locator(`svg[data-pose="${pose}"]`)).toBeVisible();
+  }
+});
+
+test("the moods differ where Design.md §3 says they differ", async ({ page }) => {
+  const pose = (name: string) =>
+    page.locator("figure").filter({ hasText: new RegExp(`^${name}$`) }).locator("svg");
+
+  // Eyes carry the emotion: open, half-closed when thirsty, closed when dozing.
+  await expect(pose("default").locator('[data-eyes="open"]')).toHaveCount(1);
+  await expect(pose("thirsty").locator('[data-eyes="half"]')).toHaveCount(1);
+  await expect(pose("sleepy").locator('[data-eyes="closed"]')).toHaveCount(1);
+
+  // A thirsty Bud's leaves droop; nobody else's are turned at all.
+  await expect(pose("thirsty").locator("[data-leaf][transform]")).toHaveCount(2);
+  await expect(pose("default").locator("[data-leaf][transform]")).toHaveCount(0);
+
+  // A sprout has one leaf and a smaller everything; the rest keep both leaves.
+  await expect(pose("sprout").locator("[data-leaf]")).toHaveCount(1);
+  await expect(pose("bloom").locator("[data-leaf]")).toHaveCount(2);
+
+  // The root-toes are in every pose — Design.md §3 calls them Bud's signature.
+  for (const name of ["sprout", "default", "bloom", "thirsty", "sleepy"]) {
+    await expect(pose(name).locator("[data-toes]"), `${name} keeps its toes`).toHaveCount(1);
+  }
+});
+
+test("a mood still reads at 24px, where most of Bud is gone", async ({ page }) => {
+  // The player's top bar. The eyes and the crown are all that is left to carry it.
+  const thirsty = swatch(page, "24 — thirsty").locator("svg");
+  await expect(thirsty).toHaveAttribute("data-detail", "simple");
+  await expect(thirsty.locator('[data-eyes="half"]')).toHaveCount(1);
+
+  await expect(swatch(page, "24 — sleepy").locator('svg [data-eyes="closed"]')).toHaveCount(1);
+  // A sprout has one leaf; every other pose has both.
+  await expect(swatch(page, "24 — sprout").locator("svg [data-leaf]")).toHaveCount(1);
+  await expect(swatch(page, "24 — default").locator("svg [data-leaf]")).toHaveCount(2);
+});
+
 test("Bud sheds detail below the 32px threshold", async ({ page }) => {
   const full = swatch(page, "32 — full").locator("svg");
   const small = swatch(page, "24 — player bar").locator("svg");

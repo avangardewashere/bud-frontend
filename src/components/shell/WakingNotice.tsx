@@ -35,7 +35,8 @@ export function WakingNotice() {
           data-testid="waking-notice"
           className="flex max-w-md items-center gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--card)] px-4 py-3"
         >
-          <Bud size={32} label={null} />
+          {/* Asleep, which is the literal truth about the thing this notice is about. */}
+          <Bud pose="sleepy" size={32} label={null} />
           <p className="text-sm">
             <span className="font-semibold">Bud&rsquo;s free server is waking up</span>
             <span className="text-[var(--muted-foreground)]">

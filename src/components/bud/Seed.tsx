@@ -29,6 +29,9 @@ export function Seed({ size = 72, label, className, style }: SeedProps) {
       width={(size * 120) / 140}
       className={className}
       style={style}
+      // Every pose carries its name, seed included — it is how the gallery and the
+      // tests tell one mood from another without reading the artwork.
+      data-pose="seed"
       {...a11y}
     >
       <ellipse cx="60" cy="122" rx="40" ry="5" fill="var(--color-ink)" opacity="0.06" />

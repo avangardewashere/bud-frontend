@@ -145,4 +145,51 @@
       transition-duration: 0.01ms !important;
     }
   }
+
+  /*
+   * The bloom — Design.md §6: about 900ms, once, when a session is finished. The gold
+   * flower opens and nothing else on the screen moves with it. transform-box keeps the
+   * scale centred on the flower itself rather than on the SVG's own origin.
+   */
+  @keyframes bud-bloom {
+    from {
+      transform: scale(0.35);
+      opacity: 0;
+    }
+    60% {
+      transform: scale(1.06);
+      opacity: 1;
+    }
+    to {
+      transform: scale(1);
+      opacity: 1;
+    }
+  }
+
+  @keyframes bud-bloom-fade {
+    from {
+      opacity: 0;
+    }
+    to {
+      opacity: 1;
+    }
+  }
+
+  .bud-bloom {
+    transform-box: fill-box;
+    transform-origin: center;
+    animation: bud-bloom 900ms ease-out 1 both;
+  }
+
+  /*
+   * After the blanket rule above, and on purpose: §6 asks for the movement to be
+   * swapped for an opacity fade, not for the moment to be deleted. A fade is not
+   * motion, so it keeps its duration.
+   */
+  @media (prefers-reduced-motion: reduce) {
+    .bud-bloom {
+      animation: bud-bloom-fade 600ms ease-out 1 both !important;
+      animation-duration: 600ms !important;
+    }
+  }
 }

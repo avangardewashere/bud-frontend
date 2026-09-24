@@ -1,13 +1,14 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bud } from "@/components/bud";
+import { Bud, MoodBud } from "@/components/bud";
 import { ContinueCard } from "@/components/course/ContinueCard";
 import { CourseCard } from "@/components/course/CourseCard";
 import { RecentNotes } from "@/components/dashboard/RecentNotes";
 import { WaitingToHandIn } from "@/components/dashboard/WaitingToHandIn";
 import { ButtonLink } from "@/components/ui/Button";
-import { budApi, type Dashboard } from "@/lib/api";
+import { budApi } from "@/lib/api";
 import { getSessionUser, serverAuth } from "@/lib/api/session";
+import { moodFor } from "@/lib/bud/mood";
 
 export const metadata: Metadata = { title: "Dashboard — Bud" };
 
@@ -28,15 +29,31 @@ export default async function DashboardPage() {
   ]);
   const enrolled = courses.filter((course) => course.enrollment !== null);
 
+  // Design.md §3's mood table, decided in one place for every screen that shows Bud.
+  const mood = moodFor(dashboard);
+
+  /**
+   * Whether anything is planted is asked of the same endpoint the mood is, not of the
+   * catalog: the two disagree when a course a learner is enrolled in stops being
+   * published, and the screen then said "Nothing planted yet" under a Bud saying which
+   * session to resume. The grid below can only draw courses the catalog still carries,
+   * so it may show fewer cards than this count — but the page no longer contradicts
+   * itself about whether this learner has started anything.
+   */
+  const planted = dashboard.totals.enrolledCourses > 0;
+
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
-      <div className="flex items-center gap-5">
-        <Bud size={72} label={null} />
+      {/* Bud is unlabelled here on purpose: the heading beside it says who this is. */}
+      <div className="flex items-center gap-5" data-testid="greeting">
+        <MoodBud mood={mood} size={72} label={null} />
         <div>
           <h1 className="text-4xl">Welcome back, {firstName(user!.name)}.</h1>
-          <p className="mt-1 text-[var(--muted-foreground)]">
-            {greeting(dashboard)}
-          </p>
+          {/*
+            Except when the empty state is about to say the same thing in bigger type:
+            two seeds and two sentences about nothing being planted is one too many.
+          */}
+          {planted && <p className="mt-1 text-[var(--muted-foreground)]">{mood.greeting}</p>}
         </div>
       </div>
 
@@ -50,7 +67,7 @@ export default async function DashboardPage() {
         </div>
       )}
 
-      {enrolled.length === 0 ? (
+      {!planted ? (
         <section className="mt-12 rounded-[var(--radius-panel)] border border-[var(--border)] bg-[var(--card)] px-6 py-16 text-center">
           <Bud pose="seed" size={110} label={null} className="mx-auto" />
           <h2 className="mt-6 text-2xl">Nothing planted yet.</h2>
@@ -99,17 +116,6 @@ export default async function DashboardPage() {
       <RecentNotes notes={dashboard.recentNotes} />
     </main>
   );
-}
-
-/** Design.md §8: warm and specific, never "Ready to crush it?!". */
-function greeting({ totals, continueCard }: Dashboard) {
-  if (totals.enrolledCourses === 0) {
-    return "Nothing is growing yet. Bud will keep track once you start a course.";
-  }
-  if (!continueCard) return "Every course finished. Bud is very pleased.";
-  return continueCard.resuming
-    ? `Session ${continueCard.sessionOrder} is where you left off.`
-    : "Bud has been keeping track.";
 }
 
 /** "Welcome back, Ari." — the greeting uses the first name only (Design.md §8). */

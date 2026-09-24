@@ -3,6 +3,7 @@
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { Button } from "@/components/ui/Button";
+import { canPublish } from "@/lib/admin/publishable";
 import { BudApiError, budApi, type AdminCourse } from "@/lib/api";
 
 /**
@@ -18,7 +19,8 @@ export function CourseStatusButton({ course }: { course: AdminCourse }) {
   const [error, setError] = useState<string | null>(null);
 
   const published = course.status === "published";
-  const publishable = course.currentVersion !== null;
+  // Not "has a current version" — that is what publishing sets. See canPublish.
+  const publishable = canPublish(course);
 
   async function toggle() {
     setBusy(true);
@@ -39,7 +41,7 @@ export function CourseStatusButton({ course }: { course: AdminCourse }) {
         variant={published ? "secondary" : "primary"}
         onClick={toggle}
         disabled={busy || !publishable}
-        title={publishable ? undefined : "This course has no version to publish yet"}
+        title={publishable ? undefined : "Upload a package that validates before publishing"}
         className="text-sm"
       >
         {published ? "Unpublish" : "Publish"}

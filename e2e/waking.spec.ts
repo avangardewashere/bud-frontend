@@ -75,6 +75,8 @@ test("a slow API raises the waking notice, which clears once it answers", async 
 
   await expect(notice(page)).toBeVisible();
   await expect(notice(page)).toContainText("waking up");
+  // The Bud in it is asleep, which is the literal truth about the server (block 17).
+  await expect(notice(page).locator("svg[data-pose]")).toHaveAttribute("data-pose", "sleepy");
   await page.waitForURL("**/dashboard");
   await expect(notice(page)).toBeHidden();
 });

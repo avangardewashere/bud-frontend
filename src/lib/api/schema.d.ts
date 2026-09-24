@@ -98,6 +98,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/auth/demo": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in as the public demo learner
+         * @description Only when DEMO_MODE is on; otherwise this route does not exist. Hands out one shared throwaway account, part-way through a course, which is reset to its sample progress once nobody has used it for a while. Anything done here is deleted with that reset.
+         */
+        post: operations["AuthController_demoSignIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/auth/github": {
         parameters: {
             query?: never;
@@ -292,6 +312,26 @@ export interface paths {
          * @description One round trip on purpose: this is the first screen after sign-in, and assembling it from three calls would let the slowest decide how the app feels.
          */
         get: operations["ProgressController_getDashboard"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/activity": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Streaks and the activity heatmap
+         * @description Days are cut in the timezone the learner set, so an evening session counts for the evening it happened in. Signing in is not activity: only studying keeps a streak alive.
+         */
+        get: operations["ProgressController_getActivity"];
         put?: never;
         post?: never;
         delete?: never;
@@ -569,6 +609,7 @@ export interface components {
         AuthProviders: {
             password: boolean;
             github: boolean;
+            demo: boolean;
             /** @enum {string} */
             signupMode: "invite_only" | "open" | "closed";
         };
@@ -816,6 +857,10 @@ export interface components {
                 lastOpenedAt: string | null;
                 /** Format: date-time */
                 completedAt: string | null;
+                estimatedHours: {
+                    total: number | null;
+                    completed: number | null;
+                };
             }[];
             recentNotes: {
                 slug: string;
@@ -834,11 +879,39 @@ export interface components {
                 asked: string;
                 sessionComplete: boolean;
             }[];
+            streak: {
+                current: number;
+                longest: number;
+                lastActiveDate: string | null;
+            };
             totals: {
                 enrolledCourses: number;
                 completedCourses: number;
                 completedSessions: number;
                 totalSessions: number;
+                estimatedHours: {
+                    total: number;
+                    completed: number;
+                };
+            };
+        };
+        Activity: {
+            timezone: string;
+            today: string;
+            streak: {
+                current: number;
+                longest: number;
+                lastActiveDate: string | null;
+            };
+            days: {
+                date: string;
+                events: number;
+                sessionsCompleted: number;
+            }[];
+            totals: {
+                activeDays: number;
+                events: number;
+                sessionsCompleted: number;
             };
         };
         Note: {
@@ -1052,6 +1125,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+        };
+    };
+    AuthController_demoSignIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Signed in as the demo learner. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserEnvelope"];
                 };
             };
         };
@@ -1351,6 +1444,26 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Dashboard"];
+                };
+            };
+        };
+    };
+    ProgressController_getActivity: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Activity for the requested window. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Activity"];
                 };
             };
         };

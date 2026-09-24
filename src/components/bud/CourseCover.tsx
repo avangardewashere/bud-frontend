@@ -8,6 +8,8 @@
  */
 
 import type { CSSProperties } from "react";
+import { coverSrc } from "@/lib/safe-href";
+import { CoverImage } from "./CoverImage";
 
 /** Stone-500, for a course that declares no accent of its own. */
 const NEUTRAL_ACCENT = "#78716C";
@@ -16,6 +18,13 @@ export type CourseCoverProps = {
   title: string;
   /** The manifest's theme.accent. */
   accent?: string;
+  /**
+   * The cover the course package shipped, if it has one — `coverUrl` from the API.
+   * Checked before it is used (coverSrc), and anything that fails falls through to the
+   * drawn cover below, so a course with a broken or foreign URL looks like a course
+   * with no cover rather than like a broken page.
+   */
+  src?: string | null;
   className?: string;
   style?: CSSProperties;
 };
@@ -23,6 +32,7 @@ export type CourseCoverProps = {
 export function CourseCover({
   title,
   accent = NEUTRAL_ACCENT,
+  src,
   className,
   style,
 }: CourseCoverProps) {
@@ -32,7 +42,7 @@ export function CourseCover({
    */
   const id = `cover-${hash(title + accent)}`;
 
-  return (
+  const drawn = (
     <svg
       viewBox="0 0 320 180"
       preserveAspectRatio="xMidYMid slice"
@@ -40,6 +50,7 @@ export function CourseCover({
       style={{ display: "block", width: "100%", height: "100%", ...style }}
       role="img"
       aria-label={`${title} — no cover image`}
+      data-testid="course-cover-drawn"
     >
       <defs>
         <pattern
@@ -69,6 +80,19 @@ export function CourseCover({
         {title}
       </text>
     </svg>
+  );
+
+  /**
+   * A plain <img>, not next/image: the optimizer would want the courses host in
+   * remotePatterns and would proxy a file that is already small through the app for no
+   * gain. The alt is empty because every card that uses this names the course in text
+   * beside it, and a cover is decoration — a repeated title is noise to listen to.
+   */
+  const cover = coverSrc(src);
+  return cover ? (
+    <CoverImage src={cover} alt="" fallback={drawn} className={className} />
+  ) : (
+    drawn
   );
 }
 

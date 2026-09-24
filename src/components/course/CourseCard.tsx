@@ -17,7 +17,11 @@ export function CourseCard({ course }: { course: CourseSummary }) {
   return (
     <article className="flex flex-col overflow-hidden rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--card)]">
       <Link href={href} className="relative block aspect-[16/9]" tabIndex={-1} aria-hidden>
-        <CourseCover title={course.title} accent={course.accentColor ?? undefined} />
+        <CourseCover
+          title={course.title}
+          accent={course.accentColor ?? undefined}
+          src={course.coverUrl}
+        />
         {course.level && (
           <span className="absolute left-3 top-3">
             <LevelPill level={course.level} />
