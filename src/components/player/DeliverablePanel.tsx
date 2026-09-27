@@ -69,6 +69,7 @@ export function DeliverablePanel({
   unknown = false,
   autoFocus = false,
   onChanged,
+  onDirtyChange,
   onClose,
 }: {
   slug: string;
@@ -93,6 +94,12 @@ export function DeliverablePanel({
   autoFocus?: boolean;
   /** Something changed on the server: this is now the truth, and the page is stale. */
   onChanged?: (next: Deliverable | null) => void;
+  /**
+   * Whether there is something typed here that the server has not been told about.
+   * The player asks so that nothing it does on a timer — the hand-over to the course's
+   * ending — happens over the top of someone mid-sentence.
+   */
+  onDirtyChange?: (dirty: boolean) => void;
   onClose?: () => void;
 }) {
   const lane = rememberKey(slug, session.key);
@@ -137,6 +144,13 @@ export function DeliverablePanel({
   useEffect(() => {
     lastKnown.set(lane, { saved, url, comment, at: Date.now() });
   }, [lane, saved, url, comment]);
+
+  // And the player is told, so its own timers keep out of the way. Closing the panel
+  // reports clean: what is typed is remembered above, and nothing is in anyone's way.
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    return () => onDirtyChange?.(false);
+  }, [dirty, onDirtyChange]);
 
   useEffect(() => {
     if (autoFocus) urlRef.current?.focus();

@@ -30,6 +30,14 @@ import { useSessionNote, type InitialNote } from "./useSessionNote";
  * border, 12px radius, no shadow — so the course reads as a page you opened rather
  * than a widget embedded in someone else's furniture (Design.md §9).
  */
+
+/**
+ * How long the flower stays open after a session is finished. Longer than the 900ms
+ * animation (Design.md §6) so the moment is seen rather than glimpsed — and it is also
+ * how long the last session's bloom holds the screen before the course's own ending.
+ */
+const BLOOM_MS = 1600;
+
 export function CoursePlayer({
   course,
   session,
@@ -62,6 +70,12 @@ export function CoursePlayer({
   /** The bloom, for the moment after a session is finished (Design.md §3 and §6). */
   const [blooming, setBlooming] = useState(false);
   const bloomTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The last session's bloom hands over to the completion screen when it closes. */
+  const finishTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** Whether this player is still the screen — a slow API outlives the page. */
+  const onScreen = useRef(true);
+  /** A link typed into the hand-in panel and not sent: the learner is mid-thought. */
+  const handInDirty = useRef(false);
   // Closing a panel puts focus back where it came from, not at the top of the page.
   const notesToggle = useRef<HTMLButtonElement>(null);
   const handInToggle = useRef<HTMLButtonElement>(null);
@@ -100,24 +114,55 @@ export function CoursePlayer({
   function bloom() {
     if (bloomTimer.current) clearTimeout(bloomTimer.current);
     setBlooming(true);
-    bloomTimer.current = setTimeout(() => setBlooming(false), 1600);
+    bloomTimer.current = setTimeout(() => setBlooming(false), BLOOM_MS);
   }
 
-  useEffect(() => () => {
-    if (bloomTimer.current) clearTimeout(bloomTimer.current);
+  useEffect(() => {
+    onScreen.current = true;
+    return () => {
+      onScreen.current = false;
+      if (bloomTimer.current) clearTimeout(bloomTimer.current);
+      if (finishTimer.current) clearTimeout(finishTimer.current);
+    };
   }, []);
 
   async function toggleComplete() {
     setMarking(true);
     setMarkError(null);
+    // Whatever this press decides, the last press's ending is no longer what is wanted.
+    if (finishTimer.current) clearTimeout(finishTimer.current);
     try {
       if (complete) await budApi.uncompleteSession(course.slug, session.key);
       else {
         await budApi.completeSession(course.slug, session.key);
         bloom();
+
+        /**
+         * The last one. The course is finished, so the moment belongs to the course and
+         * not to the session: the flower opens here, and then the completion screen
+         * takes over (mockup 1i). Counted from what this page was rendered with plus
+         * the session just marked, because the refresh below has not landed yet — and
+         * `done` excludes this session, which was not complete a moment ago.
+         *
+         * Only if this player is still the screen. Marking complete against a waking
+         * API can take sixteen seconds, and by then the learner may have moved on —
+         * arriving somewhere and being yanked to a congratulations page you did not
+         * ask for is worse than not being congratulated.
+         */
+        if (done + 1 >= ordered.length && onScreen.current) {
+          finishTimer.current = setTimeout(() => {
+            // Not over someone's shoulder: a link typed into the hand-in panel and not
+            // sent yet means they are in the middle of something on this screen.
+            if (!onScreen.current || handInDirty.current) return;
+            router.push(`/courses/${course.slug}/complete`);
+          }, BLOOM_MS);
+        }
+
         // Finishing a session that asked for something is the moment to hand it in —
         // and the dashboard is about to list it as waiting. Opening the panel here
-        // saves a hunt for the button; nothing is submitted without pressing it.
+        // saves a hunt for the button; nothing is submitted without pressing it. Even
+        // on the last session, where the screen is about to change: what is typed
+        // survives the change (tabMemory), and the ending says what is still owed.
         if (session.deliverable && !handedIn) setHandIn("offered");
       }
       router.refresh();
@@ -312,6 +357,9 @@ export function CoursePlayer({
               initial={initialDeliverable}
               unknown={deliverableUnknown}
               autoFocus={handIn === "opened"}
+              onDirtyChange={(dirty) => {
+                handInDirty.current = dirty;
+              }}
               onChanged={(next) => {
                 setHandedIn(next?.submittedAt != null);
                 router.refresh();

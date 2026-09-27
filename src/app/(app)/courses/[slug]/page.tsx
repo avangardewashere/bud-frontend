@@ -9,6 +9,7 @@ import { TagList, VersionPill } from "@/components/course/meta";
 import { ButtonLink } from "@/components/ui/Button";
 import { BudApiError, budApi, type CourseDetail } from "@/lib/api";
 import { serverAuth } from "@/lib/api/session";
+import { isFinished } from "@/lib/course/finished";
 
 type Params = { params: Promise<{ slug: string }> };
 
@@ -124,6 +125,22 @@ export default async function CoursePage({ params }: Params) {
                 className="mt-3 block text-center text-sm text-[var(--tint-foreground)] hover:underline"
               >
                 Your notes
+              </Link>
+            )}
+
+            {/*
+              Finished courses keep their ending, and the export that goes with it —
+              asked the same way the ending's own guard asks it, or this link bounces.
+            */}
+            {isFinished(course) && (
+              <Link
+                href={`/courses/${course.slug}/complete`}
+                // Leaf, not gold: Design.md §4 allows gold-600 as text only for small
+                // labels, and this is a link people read. The gold belongs to the
+                // moment itself, on the screen this leads to.
+                className="mt-2 block text-center text-sm text-[var(--tint-foreground)] hover:underline"
+              >
+                Course complete
               </Link>
             )}
           </div>
