@@ -98,14 +98,20 @@ export function BottomTabs({ user }: { user: PublicUser }) {
   );
 }
 
+/**
+ * The initials are the way to the account screen — the place people look for it, and
+ * the only thing in the bar that is about them rather than about a course.
+ */
 function Avatar({ user }: { user: PublicUser }) {
   return (
-    <span
+    <Link
+      href="/account"
+      aria-label={`Account — ${user.name}`}
       title={user.email}
-      className="flex size-8 items-center justify-center rounded-full bg-[var(--primary)] font-mono text-xs font-medium text-[var(--primary-foreground)]"
+      className="flex size-8 items-center justify-center rounded-full bg-[var(--primary)] font-mono text-xs font-medium text-[var(--primary-foreground)] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
     >
       {initials(user.name)}
-    </span>
+    </Link>
   );
 }
 

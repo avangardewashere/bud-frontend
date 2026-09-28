@@ -1,9 +1,15 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/Button";
-import { BudApiError, BudApiUnreachableError, BudApiWakingError, budApi } from "@/lib/api";
+import { useEffect, useRef, useState } from "react";
+import { Button, buttonClasses } from "@/components/ui/Button";
+import { budApi } from "@/lib/api";
+import {
+  GITHUB_SIGN_IN_PATH,
+  demoMessage,
+  signInMessage,
+  type SignInOptions,
+} from "@/lib/auth/sign-in";
 
 /**
  * The sign-in form from mockup 1a.
@@ -11,12 +17,31 @@ import { BudApiError, BudApiUnreachableError, BudApiWakingError, budApi } from "
  * The API owns the session, so this posts from the browser and lets the Set-Cookie
  * land, then refreshes so the server components pick the session up.
  */
-export function LoginForm() {
+export function LoginForm({
+  options,
+  error: arrived,
+}: {
+  options: SignInOptions;
+  /** What the API said went wrong on the way back from somewhere else, if anything. */
+  error: string | null;
+}) {
   const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(arrived);
+  const [busy, setBusy] = useState<null | "password" | "demo">(null);
+  const alert = useRef<HTMLParagraphElement>(null);
+
+  /**
+   * An error that arrived with the page is in the first paint, which is exactly why
+   * nothing announces it: a live region only reports what changes *after* it is
+   * mounted, so a screen reader runs past it with the rest of the card. Focusing it
+   * says it, and puts the reader at the thing that needs reading — while a message
+   * raised later by this form does change a mounted region, and is announced already.
+   */
+  useEffect(() => {
+    if (arrived) alert.current?.focus();
+  }, [arrived]);
 
   /**
    * Wake the API while they type. On the $0 deploy it may have been asleep for hours,
@@ -33,7 +58,7 @@ export function LoginForm() {
 
   async function onSubmit(event: React.FormEvent) {
     event.preventDefault();
-    setBusy(true);
+    setBusy("password");
     setError(null);
 
     try {
@@ -41,13 +66,41 @@ export function LoginForm() {
       router.replace("/dashboard");
       router.refresh();
     } catch (cause) {
-      setError(messageFor(cause));
-      setBusy(false);
+      setError(signInMessage(cause));
+      setBusy(null);
+    }
+  }
+
+  /**
+   * The demo: one shared account, part-way through a course, reset when nobody has
+   * used it for a while. Someone already in it gets the same account back rather than
+   * a second place in a capped pool — so a 200 with no new cookie is success, not a
+   * failure to sign in.
+   */
+  async function onDemo() {
+    setBusy("demo");
+    setError(null);
+
+    try {
+      await budApi.demoSignIn();
+      router.replace("/dashboard");
+      router.refresh();
+    } catch (cause) {
+      setError(demoMessage(cause));
+      setBusy(null);
     }
   }
 
   return (
-    <form onSubmit={onSubmit} className="mt-8 space-y-4">
+    /*
+      `method="post"` for the seconds before hydration. A form with neither method nor
+      action submits as a GET to its own URL, so someone who types a password and
+      presses Enter while the JavaScript is still arriving — likeliest on the cold,
+      slow deploy this whole app is built for — puts it in the address bar, the
+      history, and any log in front of the shell. A POST lands in a request body that
+      the page route refuses, which costs one press and leaks nothing.
+    */
+    <form onSubmit={onSubmit} method="post" className="mt-8 space-y-4">
       <Field
         id="email"
         label="Email"
@@ -66,32 +119,58 @@ export function LoginForm() {
       />
 
       {error && (
-        <p role="alert" className="text-sm text-[var(--danger)]">
+        <p
+          ref={alert}
+          tabIndex={-1}
+          role="alert"
+          className="text-sm text-[var(--danger)] outline-none"
+        >
           {error}
         </p>
       )}
 
-      <Button type="submit" disabled={busy} className="w-full">
-        {busy ? "Signing in…" : "Continue"}
+      <Button type="submit" disabled={busy !== null} className="w-full">
+        {busy === "password" ? "Signing in…" : "Continue"}
       </Button>
 
-      <div className="flex items-center gap-3 py-2 text-sm text-[var(--muted-foreground)]">
-        <span className="h-px flex-1 bg-[var(--border)]" />
-        or
-        <span className="h-px flex-1 bg-[var(--border)]" />
-      </div>
+      {(options.github || options.demo) && (
+        <div className="flex items-center gap-3 py-2 text-sm text-[var(--muted-foreground)]">
+          <span className="h-px flex-1 bg-[var(--border)]" />
+          or
+          <span className="h-px flex-1 bg-[var(--border)]" />
+        </div>
+      )}
 
-      {/* GitHub OAuth is Phase 2; shown because the mockup does, disabled because it
-          would not work. */}
-      <Button
-        variant="secondary"
-        disabled
-        title="GitHub sign-in arrives with Phase 2"
-        className="w-full"
-      >
-        <span className="size-3 rounded-full bg-[var(--color-ink)]" aria-hidden />
-        Continue with GitHub
-      </Button>
+      {/*
+        A link, not a fetch: OAuth is a navigation, and it goes through the shell's own
+        /api rewrite so the session cookie the API sets lands on this host. A deployment
+        without GitHub configured does not render it at all — a button that 404s is
+        worse than no button (the API answers 404 for the route in that case too).
+      */}
+      {options.github && (
+        <a href={GITHUB_SIGN_IN_PATH} className={buttonClasses("secondary", "w-full")}>
+          <GitHubMark />
+          Continue with GitHub
+        </a>
+      )}
+
+      {options.demo && (
+        <Button
+          variant="secondary"
+          onClick={onDemo}
+          disabled={busy !== null}
+          className="w-full"
+        >
+          {busy === "demo" ? "Opening the demo…" : "Look around the demo"}
+        </Button>
+      )}
+
+      {options.demo && (
+        <p className="text-center text-xs text-[var(--muted-foreground)]">
+          A shared account, part-way through a course — other people may be in it right
+          now, and can see anything you write. It is wiped when it resets.
+        </p>
+      )}
     </form>
   );
 }
@@ -130,18 +209,12 @@ function Field({
   );
 }
 
-/** Voice: short, warm, specific (Design.md §8). Never "Oops! Something went wrong". */
-function messageFor(cause: unknown) {
-  if (cause instanceof BudApiWakingError) {
-    return "Bud's free server is still waking up. Give it a minute, then try again.";
-  }
-  if (cause instanceof BudApiUnreachableError) {
-    return "Couldn't reach Bud just now. Is the API running?";
-  }
-  if (cause instanceof BudApiError) {
-    if (cause.isUnauthorized) return "That email and password don't match.";
-    if (cause.statusCode === 429) return "Too many attempts. Give it a minute.";
-    return cause.message;
-  }
-  return "Couldn't sign in. Trying again may help.";
+/** GitHub's mark, drawn rather than fetched: one icon is not worth a dependency. */
+function GitHubMark() {
+  return (
+    <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden fill="currentColor">
+      <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82a7.4 7.4 0 0 1 2-.27c.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z" />
+    </svg>
+  );
 }
+

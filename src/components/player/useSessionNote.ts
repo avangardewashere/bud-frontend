@@ -202,6 +202,15 @@ function describeNoteError(error: unknown): SaveState {
     };
   }
   if (error instanceof BudApiError) {
+    // The queue already refuses to re-send this one — a 4xx is not a bad connection —
+    // so the only thing left to get right is saying which 4xx it was.
+    if (error.isUnauthorized) {
+      return {
+        status: "error",
+        message: "You've been signed out. Sign in again — this tab still has your work.",
+        permanent: true,
+      };
+    }
     if (error.code === "not_enrolled") {
       return { status: "error", message: "You're not enrolled in this course.", permanent: true };
     }

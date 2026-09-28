@@ -397,3 +397,39 @@ test("on a phone the notes are a tab in the session sheet", async ({ page }) => 
 
   await clearNotes(page, ["s1"]);
 });
+
+test("a note that fails with 401 says the session ended, not that the note was bad", async ({
+  page,
+}) => {
+  /**
+   * The same sentence the worksheet's own saves use (player.spec.ts), because it is
+   * the same event: the cookie expired, or a password changed somewhere else, and
+   * every write from this tab now comes back 401. What a learner needs to hear is
+   * that the typing is still here and signing in again keeps it — "Couldn't save that
+   * note" reads as though the note were the problem, and invites them to retype it.
+   */
+  await clearNotes(page, ["s1"]);
+  await openSession(page, SLUG, "s1");
+  await notesButton(page).click();
+
+  await page.route("**/api/me/courses/**/sessions/**/notes", async (route) =>
+    isNotePut(route.request().method(), route.request().url())
+      ? route.fulfill({
+          status: 401,
+          contentType: "application/json",
+          body: JSON.stringify({
+            statusCode: 401,
+            error: "Unauthorized",
+            code: "unauthorized",
+            message: "No session.",
+          }),
+        })
+      : route.continue(),
+  );
+
+  await editor(page).fill(`Typed after the session ended ${Date.now()}`);
+
+  const signedOut = noteStatus(page, /You've been signed out/);
+  await expect(signedOut).toBeVisible({ timeout: 20_000 });
+  await expect(signedOut).toContainText("this tab still has your work");
+});

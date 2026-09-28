@@ -483,6 +483,25 @@ export const budApi = {
     return request<AuthProviders>("GET", "/auth/providers", undefined, options);
   },
 
+  /**
+   * Sign in as the shared demo learner, for someone who wants to look around before
+   * anything is theirs.
+   *
+   * Two answers are not failures and callers must not treat them as such. A caller who
+   * already has a demo session gets a 200 with no new cookie — minting another would
+   * spend a place in the capped pool and sign somebody else out. And a 503 means every
+   * place is taken right now, which is worth saying kindly and trying again.
+   *
+   * Not retried automatically: a second claim is not the same request twice.
+   */
+  async demoSignIn(options?: RequestOptions): Promise<PublicUser> {
+    const result = await request<UserEnvelope>("POST", "/auth/demo", undefined, {
+      ...options,
+      retry: false,
+    });
+    return result.user;
+  },
+
   // ── notes ───────────────────────────────────────────────────────────────────
   // What the course asked the learner to write. Every Docker session asks for a
   // notes.md entry, and these are where it lives (Overall Plan §5.7).
@@ -524,6 +543,22 @@ export const budApi = {
    */
   notesExportUrl(slug: string): string {
     return `${BROWSER_API_BASE}${coursePath(slug)}/notes/export`;
+  },
+
+  /**
+   * Everything this learner owns, as a zip: profile, progress, notes, deliverables,
+   * the blobs the worksheets saved, and the activity history, plus the same Markdown
+   * the per-course export produces.
+   *
+   * A link for the same reasons as that one — same-origin through the rewrite so the
+   * cookie goes, and the API names the file. Two things the API asked callers to
+   * respect: it is rate limited far more tightly than anything else (6/min), and it
+   * builds the whole archive before sending, so on a sleeping instance the first
+   * request pays the cold start as well. Both are arguments for a link the browser
+   * owns rather than a fetch this app would have to time out and retry.
+   */
+  exportUrl(): string {
+    return `${BROWSER_API_BASE}/me/export`;
   },
 
   // ── deliverables ────────────────────────────────────────────────────────────

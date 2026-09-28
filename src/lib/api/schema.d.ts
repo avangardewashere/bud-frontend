@@ -549,6 +549,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Everything you own, as a zip
+         * @description A JSON document with your profile, courses, progress, notes, deliverables, the blobs the worksheets saved and your whole activity history, plus your notes as Markdown per course, plus a README saying what is in it and what is deliberately left out. Sign-in sessions and your account ids at sign-in providers are not included.
+         */
+        get: operations["ExportController_export"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/health": {
         parameters: {
             query?: never;
@@ -1906,6 +1926,24 @@ export interface operations {
         responses: {
             /** @description Gone. */
             204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    ExportController_export: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description A zip archive. */
+            200: {
                 headers: {
                     [name: string]: unknown;
                 };

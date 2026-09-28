@@ -116,6 +116,14 @@ export function useCourseBridge({
       };
     }
     if (error instanceof BudApiError) {
+      /*
+        A session that ended while the tab stayed open — the commonest way a save stops
+        working after working all morning. Saying so beats "couldn't save that", which
+        sounds like the work was the problem.
+      */
+      if (error.isUnauthorized) {
+        return { status: "error", message: "You've been signed out. Sign in again — this tab still has your work.", permanent: true };
+      }
       if (error.code === "not_enrolled") {
         return { status: "error", message: "You're not enrolled in this course.", permanent: true };
       }

@@ -22,8 +22,15 @@ test("a signed-out visitor is sent to the login screen", async ({ page }) => {
   await expect(page.getByText("Glad you showed up.")).toBeVisible();
   await expect(page.getByText("Signup is invite-only for now.")).toBeVisible();
 
-  // Shown because the mockup shows it, disabled because Phase 2 owns it.
-  await expect(page.getByRole("button", { name: /Continue with GitHub/ })).toBeDisabled();
+  /**
+   * Block 20 retired the disabled placeholder this used to assert. GitHub is a real
+   * link now, and it appears only where the API reports it configured — so what the
+   * shell must never do is offer a *dead* one. Which of the two is right for this
+   * deployment is account.spec's business; here it is enough that nothing on the card
+   * is a button that cannot be pressed.
+   */
+  await expect(page.getByRole("button", { name: /Continue with GitHub/ })).toBeHidden();
+  await expect(page.getByRole("button", { name: "Continue", exact: true })).toBeEnabled();
 });
 
 test("the root path leads to the dashboard", async ({ page }) => {
@@ -75,8 +82,12 @@ test("the nav shows Admin to an admin, and marks the current section", async ({ 
     "page",
   );
   await expect(nav.getByRole("link", { name: "Catalog" })).toBeVisible();
-  // mockup 1j is a learner and has no Admin item; the seeded user is an admin.
-  await expect(nav.getByRole("link", { name: "Admin" })).toBeVisible();
+  /**
+   * mockup 1j is a learner and has no Admin item; the seeded user is an admin.
+   * `exact`, because block 20 made the avatar a link to /account labelled
+   * "Account — Bud Admin", which a substring match claims as a second Admin nav item.
+   */
+  await expect(nav.getByRole("link", { name: "Admin", exact: true })).toBeVisible();
 });
 
 test("Browse the catalog goes somewhere real", async ({ page }) => {

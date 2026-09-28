@@ -193,3 +193,46 @@ test("an unknown session key is a 404", async ({ page }) => {
   const response = await page.goto(`/learn/${SLUG}/no-such-session`);
   expect(response?.status()).toBe(404);
 });
+
+test("a session that ended while the tab stayed open says so, and says the work is safe", async ({
+  page,
+}) => {
+  /**
+   * The commonest way saving stops working after working all morning: the cookie
+   * expired, or someone changed their password somewhere else, and every write now
+   * comes back 401. "Couldn't save that" reads as though the work were the problem, so
+   * the shell says what actually happened and what is still true — the typing is in
+   * this tab, and signing in again keeps it.
+   *
+   * The API is real here, so the 401 is mocked at the browser's own request: the
+   * worksheet's state goes through /api from this page, which is exactly how
+   * waking.spec forces a gateway error.
+   */
+  await openSession(page, SLUG, SESSION_1);
+
+  await page.route("**/api/me/courses/**/state/**", (route) =>
+    route.fulfill({
+      status: 401,
+      contentType: "application/json",
+      body: JSON.stringify({
+        statusCode: 401,
+        error: "Unauthorized",
+        code: "unauthorized",
+        message: "No session.",
+      }),
+    }),
+  );
+
+  const tick = frame(page).locator("#t1");
+  await tick.uncheck({ force: true });
+  await tick.check({ force: true });
+
+  const signedOut = page.getByRole("status").filter({ hasText: "You've been signed out" });
+  await expect(signedOut).toBeVisible();
+  await expect(signedOut).toContainText("this tab still has your work");
+
+  /**
+   * The notes panel is a second hook with the same failure and the same promise; its
+   * copy is asserted in notes.spec.ts, beside the rest of that panel's behaviour.
+   */
+});
