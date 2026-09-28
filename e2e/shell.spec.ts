@@ -54,9 +54,12 @@ test("signing in lands on the dashboard, greeted by name", async ({ page, contex
   expect(session, "the API should have set bud_session").toBeTruthy();
   expect(session?.httpOnly, "the session cookie must be httpOnly").toBe(true);
 
-  await expect(page.getByRole("heading", { level: 1 })).toHaveText(
-    `Welcome back, ${ADMIN.firstName}.`,
-  );
+  /**
+   * The greeting itself is moods.spec's and theme.spec's business, and after block 19
+   * its first two words depend on the hour where the test is running. This one cares
+   * that it is greeted by name, so that is what it asks.
+   */
+  await expect(page.getByRole("heading", { level: 1 })).toContainText(ADMIN.firstName);
 
   // Deliberately says nothing about enrollment: catalog.spec owns that state, and
   // asserting it here would make this test depend on another file's leftovers.

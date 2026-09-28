@@ -157,21 +157,43 @@ test("the greetings say something specific, and never shout", () => {
   }
 });
 
-test("dozing is about the hour, not about progress", () => {
+test("dozing is about the hour or the theme, not about progress", () => {
   const mid = { pose: "default", greeting: "Bud has been keeping track." } as const;
-  expect(atThisHour(mid, 14).pose).toBe("default");
-  expect(atThisHour(mid, 22).pose).toBe("sleepy");
-  expect(atThisHour(mid, 2).pose).toBe("sleepy");
-  expect(atThisHour(mid, 5).pose).toBe("default");
-  // The words never change with the hour; only the face does.
-  expect(atThisHour(mid, 23).greeting).toBe(mid.greeting);
+  const at = (hour: number, dark = false) => atThisHour(mid, { hour, dark });
 
-  // A beginning and a celebration are not slept through.
+  expect(at(14).pose).toBe("default");
+  expect(at(22).pose).toBe("sleepy");
+  expect(at(2).pose).toBe("sleepy");
+  expect(at(5).pose).toBe("default");
+
+  // Dark mode dozes at any hour: a dark screen is a dark room often enough (§3).
+  expect(at(14, true).pose).toBe("sleepy");
+
+  // A beginning and a celebration are not slept through, whatever the theme.
   for (const pose of ["seed", "sprout", "bloom"] as const) {
-    expect(atThisHour({ pose, greeting: "" }, 23).pose).toBe(pose);
+    expect(atThisHour({ pose, greeting: "" }, { hour: 23, dark: true }).pose).toBe(pose);
   }
   // Thirsty does doze: it is the everyday face of someone who is not here.
-  expect(atThisHour({ pose: "thirsty", greeting: "" }, 23).pose).toBe("sleepy");
+  expect(atThisHour({ pose: "thirsty", greeting: "" }, { hour: 23 }).pose).toBe("sleepy");
+});
+
+test("the evening words follow the clock, and only the clock", () => {
+  const mid = { pose: "default", greeting: "Session 4 is where you left off." } as const;
+
+  // Mockup 1k: late, the line gains a reassurance and the heading changes with it.
+  const late = atThisHour(mid, { hour: 23 });
+  expect(late.greeting).toBe("Session 4 is where you left off. It'll keep.");
+  expect(late.evening).toBe(true);
+
+  /**
+   * Dark at ten in the morning is not an evening. Someone who simply prefers dark is
+   * not having one, and a page that tells them they are is a page that does not know
+   * what time it is — so the theme moves the face and never the words.
+   */
+  const darkMorning = atThisHour(mid, { hour: 10, dark: true });
+  expect(darkMorning.pose).toBe("sleepy");
+  expect(darkMorning.greeting).toBe(mid.greeting);
+  expect(darkMorning.evening).toBe(false);
 });
 
 test("the player's Bud reads one course, and never dozes over someone's work", () => {

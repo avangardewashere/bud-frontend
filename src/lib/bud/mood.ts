@@ -23,12 +23,19 @@ import type { Dashboard } from "@/lib/api";
  * late hour, and it only ever replaces the two everyday faces (see `atThisHour`).
  */
 
-export type Mood = { pose: BudPose; greeting: string };
+export type Mood = {
+  pose: BudPose;
+  greeting: string;
+  /** Late where the reader is — the one thing that changes the words, not just the face. */
+  evening?: boolean;
+};
 
 const AWAY_MS = 7 * 24 * 60 * 60 * 1000;
 /** Design.md §3: "late local time". After this hour, and before 5, Bud dozes. */
 const LATE_FROM = 22;
 const LATE_UNTIL = 5;
+/** Mockup 1k's "Good evening" — which is only true in the evening. */
+const EVENING_FROM = 18;
 
 export function moodFor(dashboard: Dashboard, now: number = Date.now()): Mood {
   const { totals, continueCard, courses } = dashboard;
@@ -110,18 +117,37 @@ function awayFor(courses: Dashboard["courses"], now: number): number {
 }
 
 /**
- * The same mood, dozing when it is late where the reader is.
+ * The same mood, in the room the reader is actually in — Design.md §3's sleepy row is
+ * "dark mode, or late local time", and mockup 1k's dark dashboard also changes the
+ * words: "Good evening, Ari." / "Session 4 is where you left off. It'll keep."
  *
- * Separate from `moodFor` because the server cannot know: it renders in a datacentre's
- * timezone, and the hour it would use is not the learner's. The client applies this
- * after hydration (MoodBud.tsx). Dark mode will join it here in block 19.
+ * The two halves of that are deliberately not the same condition. **Dozing** follows
+ * either the hour or the theme, because a dark screen is a dark room often enough and
+ * Bud asleep on it looks right. **The evening words** follow only the hour: someone
+ * who simply prefers dark at ten in the morning is not having an evening, and a page
+ * that tells them they are is a page that does not know what time it is.
+ *
+ * Separate from `moodFor` because the server cannot know either thing for certain: it
+ * renders in a datacentre's timezone, and the theme may be the device's own. The
+ * browser applies this after hydration (src/components/dashboard/Greeting.tsx).
  *
  * Only the everyday faces doze. A seed is an empty state, a sprout is a beginning and
  * a bloom is a celebration — none of them should be asleep at their own moment.
  */
-export function atThisHour(mood: Mood, hour: number): Mood {
+export function atThisHour(mood: Mood, { hour, dark = false }: { hour: number; dark?: boolean }): Mood {
   const late = hour >= LATE_FROM || hour < LATE_UNTIL;
-  if (!late) return mood;
-  if (mood.pose !== "default" && mood.pose !== "thirsty") return mood;
-  return { ...mood, pose: "sleepy" };
+  /** An evening is an evening. At three in the morning "Good evening" is a joke. */
+  const evening = hour >= EVENING_FROM && hour <= 23;
+  const everyday = mood.pose === "default" || mood.pose === "thirsty";
+
+  return {
+    ...mood,
+    pose: everyday && (late || dark) ? "sleepy" : mood.pose,
+    /**
+     * "It'll keep" is about work that is waiting, so it is only said to someone who
+     * has some. A finished course does not keep, and a beginning has not started.
+     */
+    greeting: late && everyday ? `${mood.greeting} It'll keep.` : mood.greeting,
+    evening,
+  };
 }

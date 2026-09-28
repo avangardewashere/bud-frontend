@@ -8,6 +8,7 @@
 @theme {
   --color-leaf-50: #ecfdf5;
   --color-leaf-100: #d1fae5;
+  --color-leaf-300: #6ee7b7;
   --color-leaf-400: #34d399;
   --color-leaf-500: #10b981;
   --color-leaf-600: #059669;
@@ -21,6 +22,8 @@
   --color-paper: #fafaf7;
   --color-stone-100: #f5f5f4;
   --color-stone-300: #d6d3d1;
+  /* Secondary text in the dark: stone-500 on soil-lift is 3.2:1, this is 6.0:1. */
+  --color-stone-400: #a8a29e;
   --color-stone-500: #78716c;
   --color-ink: #14201b;
   --color-soil: #1c1917;
@@ -42,9 +45,18 @@
    Components reference these, never the raw palette, so dark mode is a data
    attribute flip rather than a rewrite.
 
-   Dark values are defined but nothing sets data-theme="dark" in v0 — dark mode
-   is Phase 2. There is deliberately no prefers-color-scheme rule: the shell
-   ships light until the toggle exists.
+   Dark mode arrives by two routes, and they set the same values (block 19):
+
+     :root[data-theme="dark"]                 someone chose dark
+     @media (prefers-color-scheme: dark)      the device says dark and nobody
+       :root:not([data-theme="light"])        has overridden it
+
+   The block is written twice on purpose. A selector list cannot span a media
+   query, and the alternatives — light-dark(), or a script that resolves the
+   media query into an attribute — are respectively newer than this app's
+   browser floor and exactly the blocking inline script the nonce CSP refuses.
+   e2e/theme.spec.ts renders both ways and compares every token, so the copy
+   cannot drift from the original without a test failing.
    --------------------------------------------------------------------------- */
 
 :root {
@@ -63,16 +75,29 @@
   --tint-foreground: var(--color-leaf-700);
   --ring: var(--color-leaf-500);
   --danger: #e11d48;
+
+  /*
+   * The artwork's own two surfaces. The pot, the seed's mound and the not-started
+   * status dot are objects rather than text, and they were drawn in stone — which in
+   * the dark made them the brightest things on the page. They follow the theme now.
+   */
+  --clay: var(--color-stone-100);
+  --clay-line: var(--color-stone-300);
+  /* What has not grown yet: pale green on paper, a dim green in the dark. */
+  --unfilled: var(--color-leaf-100);
+  --primary-hover: var(--color-leaf-600);
 }
 
 :root[data-theme="dark"] {
+  color-scheme: dark;
   --background: var(--color-soil);
   --foreground: var(--color-stone-100);
   --card: var(--color-soil-lift);
   --card-foreground: var(--color-stone-100);
-  --muted: var(--color-soil-lift);
-  --muted-foreground: var(--color-stone-500);
-  --border: #3a3532;
+  --muted: #322c29;
+  /* Stone-500 on soil-lift is 4.0:1 — below AA for the small print it is used for. */
+  --muted-foreground: var(--color-stone-400);
+  --border: #453e3a;
   --primary: var(--color-leaf-400);
   --primary-foreground: var(--color-soil);
   --accent: var(--color-gold-400);
@@ -80,6 +105,39 @@
   --tint: #123326;
   --tint-foreground: var(--color-leaf-400);
   --ring: var(--color-leaf-400);
+  /* Rose-600 is too dark to read on soil; rose-400 carries the same meaning. */
+  --danger: #fb7185;
+  --clay: #3a3330;
+  --clay-line: #4a423e;
+  --unfilled: #1f4436;
+  /* Lighter on hover in the dark, not darker: primary is leaf-400 here. */
+  --primary-hover: var(--color-leaf-300);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --background: var(--color-soil);
+    --foreground: var(--color-stone-100);
+    --card: var(--color-soil-lift);
+    --card-foreground: var(--color-stone-100);
+    --muted: #322c29;
+    --muted-foreground: var(--color-stone-400);
+    --border: #453e3a;
+    --primary: var(--color-leaf-400);
+    --primary-foreground: var(--color-soil);
+    --accent: var(--color-gold-400);
+    --accent-foreground: var(--color-soil);
+    --tint: #123326;
+    --tint-foreground: var(--color-leaf-400);
+    --ring: var(--color-leaf-400);
+    --danger: #fb7185;
+    --clay: #3a3330;
+    --clay-line: #4a423e;
+    --unfilled: #1f4436;
+    /* Lighter on hover in the dark, not darker: primary is leaf-400 here. */
+    --primary-hover: var(--color-leaf-300);
+  }
 }
 
 @theme inline {

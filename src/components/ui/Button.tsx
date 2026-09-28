@@ -20,7 +20,7 @@ const BASE =
   "focus-visible:outline-[var(--ring)] disabled:pointer-events-none disabled:opacity-50";
 
 const VARIANTS: Record<ButtonVariant, string> = {
-  primary: "bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--color-leaf-600)]",
+  primary: "bg-[var(--primary)] text-[var(--primary-foreground)] hover:bg-[var(--primary-hover)]",
   secondary:
     "border border-[var(--border)] bg-[var(--card)] text-[var(--foreground)] hover:bg-[var(--muted)]",
   ghost: "text-[var(--tint-foreground)] hover:bg-[var(--tint)]",

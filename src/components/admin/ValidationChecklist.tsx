@@ -70,11 +70,16 @@ function Icon({ severity, code }: { severity: ValidationResult["severity"]; code
     );
   }
 
+  /*
+    Outlined rather than filled, since block 19: white on a filled badge was 2.5:1 on
+    leaf-500 in the light theme and worse on the lighter rose the dark theme uses. The
+    colour now carries the meaning as text on the card, where it is readable in both.
+  */
   if (severity === "error") {
     return (
       <span
         aria-label="Error"
-        className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--danger)] text-xs font-bold text-white"
+        className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-[var(--danger)] text-xs font-bold text-[var(--danger)]"
       >
         ✕
       </span>
@@ -95,7 +100,7 @@ function Icon({ severity, code }: { severity: ValidationResult["severity"]; code
   return (
     <span
       aria-label="Passed"
-      className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full bg-[var(--color-leaf-500)] text-xs font-bold text-white"
+      className="mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full border border-[var(--tint-foreground)] text-xs font-bold text-[var(--tint-foreground)]"
     >
       ✓
     </span>

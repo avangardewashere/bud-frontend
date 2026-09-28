@@ -65,6 +65,12 @@ export function CourseCover({
         </pattern>
       </defs>
 
+      {/*
+        An opaque base first. The tint and the stripes are both translucent, so without
+        it the card showed straight through and, in the dark theme, the cover and the
+        card became the same surface with some faint blue stripes over both.
+      */}
+      <rect width="320" height="180" fill="var(--muted)" />
       <rect width="320" height="180" fill={`${accent}14`} />
       <rect width="320" height="180" fill={`url(#${id})`} />
 
@@ -72,7 +78,12 @@ export function CourseCover({
         x="160"
         y="96"
         textAnchor="middle"
-        fill={accent}
+        /*
+          The course's accent is the pattern's; the title is the page's own ink. An
+          accent chosen to look good on paper — the Docker course's slate blue — is
+          nearly invisible on soil, and this is the one part of the cover to read.
+        */
+        fill="var(--foreground)"
         fontFamily="var(--font-mono)"
         fontSize="13"
         opacity="0.85"

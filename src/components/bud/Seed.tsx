@@ -48,7 +48,7 @@ export function Seed({ size = 72, label, className, style }: SeedProps) {
 
       <path
         d="M14 120 C28 100 44 106 60 106 C76 106 92 100 106 120 Z"
-        fill="var(--color-stone-300)"
+        fill="var(--clay-line)"
       />
     </svg>
   );

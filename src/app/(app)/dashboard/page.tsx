@@ -1,8 +1,9 @@
 import type { Metadata } from "next";
 import Link from "next/link";
-import { Bud, MoodBud } from "@/components/bud";
+import { Bud } from "@/components/bud";
 import { ContinueCard } from "@/components/course/ContinueCard";
 import { CourseCard } from "@/components/course/CourseCard";
+import { Greeting } from "@/components/dashboard/Greeting";
 import { RecentNotes } from "@/components/dashboard/RecentNotes";
 import { WaitingToHandIn } from "@/components/dashboard/WaitingToHandIn";
 import { ButtonLink } from "@/components/ui/Button";
@@ -44,18 +45,11 @@ export default async function DashboardPage() {
 
   return (
     <main className="mx-auto max-w-5xl px-6 py-12">
-      {/* Bud is unlabelled here on purpose: the heading beside it says who this is. */}
-      <div className="flex items-center gap-5" data-testid="greeting">
-        <MoodBud mood={mood} size={72} label={null} />
-        <div>
-          <h1 className="text-4xl">Welcome back, {firstName(user!.name)}.</h1>
-          {/*
-            Except when the empty state is about to say the same thing in bigger type:
-            two seeds and two sentences about nothing being planted is one too many.
-          */}
-          {planted && <p className="mt-1 text-[var(--muted-foreground)]">{mood.greeting}</p>}
-        </div>
-      </div>
+      {/*
+        The greeting is a client component: the hour and the device's colour preference
+        are the two things this render cannot know, and both change what it says.
+      */}
+      <Greeting name={firstName(user!.name)} mood={mood} quiet={!planted} />
 
       {dashboard.continueCard && (
         <div className="mt-8">

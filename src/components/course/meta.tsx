@@ -60,7 +60,7 @@ export function StatusDot({ status }: { status: CourseSession["status"] }) {
       />
     );
   }
-  return <span aria-hidden className="size-2 rounded-full bg-[var(--color-stone-300)]" />;
+  return <span aria-hidden className="size-2 rounded-full bg-[var(--clay-line)]" />;
 }
 
 export const STATUS_LABELS: Record<CourseSession["status"], string> = {

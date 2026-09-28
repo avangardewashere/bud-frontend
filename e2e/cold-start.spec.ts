@@ -26,7 +26,12 @@ const control = async (page: Page, path: string) => {
 };
 
 const phase = (page: Page) => page.getByTestId("recovery-phase");
-const dashboard = (page: Page) => page.getByRole("heading", { name: /^Welcome back/ });
+/**
+ * The dashboard has arrived — by the learner's name, not by the greeting: after block
+ * 19 the first two words of that heading change in the evening.
+ */
+const dashboard = (page: Page) =>
+  page.getByRole("heading", { level: 1, name: /Learner|Bud/ });
 
 test.skip(!PROXY, "Set BUD_SLEEPY_PROXY to run the cold-start checks — see this file's header.");
 

@@ -86,7 +86,7 @@ export function GrowthMeter({
       {inProgress && (
         <path
           d={`M50 ${grownTopY} L50 ${pendingTopY}`}
-          stroke="var(--color-leaf-100)"
+          stroke="var(--unfilled)"
           strokeWidth="4"
           strokeLinecap="round"
           fill="none"
@@ -133,8 +133,8 @@ export function GrowthMeter({
 function Pot() {
   return (
     <g
-      fill="var(--color-stone-100)"
-      stroke="var(--color-stone-300)"
+      fill="var(--clay)"
+      stroke="var(--clay-line)"
       strokeWidth="2"
       strokeLinejoin="round"
     >
@@ -164,7 +164,7 @@ function Leaf({
     <path
       d={d}
       fill="none"
-      stroke="var(--color-leaf-100)"
+      stroke="var(--unfilled)"
       strokeWidth="2"
       data-leaf="pending"
     />

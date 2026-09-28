@@ -1,10 +1,7 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useHydrated } from "@/lib/hydrated";
 import { formatDay } from "@/lib/format";
-
-/** Nothing to subscribe to: this store only ever answers "am I in the browser?". */
-const NEVER_CHANGES = () => () => {};
 
 /**
  * A date, shown in the reader's own day rather than the server's.
@@ -15,16 +12,11 @@ const NEVER_CHANGES = () => () => {};
  * src/lib/format.ts, and React hydrates against exactly that), and the browser then
  * re-renders it in the timezone the reader actually lives in.
  *
- * useSyncExternalStore rather than an effect: it has a server snapshot and a client
- * one by design, which is precisely this problem, and it does not set state during a
- * commit to do it.
+ * The swap waits for hydration (src/lib/hydrated.ts), so the markup React hydrates is
+ * exactly the markup the server sent.
  */
 export function LocalDay({ iso }: { iso: string | null | undefined }) {
-  const hydrated = useSyncExternalStore(
-    NEVER_CHANGES,
-    () => true,
-    () => false,
-  );
+  const hydrated = useHydrated();
 
   const text = hydrated ? inReadersZone(iso) : formatDay(iso);
   if (!text) return null;

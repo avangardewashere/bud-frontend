@@ -265,6 +265,38 @@ test("no page in the app violates its own policy", async ({ page }) => {
   expect(violations, violations.join("\n")).toEqual([]);
 });
 
+/**
+ * And again in the dark (block 19). A theme is a different set of colours, not a
+ * different set of rules — but it is also a cookie the server reads and an attribute
+ * on <html>, so the walk is worth repeating rather than assuming.
+ */
+test("no page violates its policy in dark mode either", async ({ page, context }) => {
+  await context.addCookies([
+    { name: "bud_theme", value: "dark", url: "http://localhost:3100" },
+  ]);
+  await page.addInitScript(() => {
+    const seen: string[] = [];
+    (window as unknown as { __cspViolations: string[] }).__cspViolations = seen;
+    document.addEventListener("securitypolicyviolation", (e) => {
+      seen.push(`${e.violatedDirective} ← ${e.blockedURI || "(inline)"} @ ${location.pathname}`);
+    });
+  });
+
+  const violations: string[] = [];
+  for (const path of ["/dashboard", "/catalog", `/courses/${SLUG}`, "/brand"]) {
+    await page.goto(path);
+    await page.waitForLoadState("networkidle").catch(() => {});
+    await expect(page.locator("html")).toHaveAttribute("data-theme", "dark");
+    violations.push(
+      ...(await page.evaluate(
+        () => (window as unknown as { __cspViolations?: string[] }).__cspViolations ?? [],
+      )),
+    );
+  }
+
+  expect(violations, violations.join("\n")).toEqual([]);
+});
+
 test("a course cannot navigate its own frame off the courses origin", async ({ page }) => {
   await openPlayer(page);
 

@@ -1,7 +1,14 @@
 import type { Metadata } from "next";
 import { Nunito, Nunito_Sans, JetBrains_Mono } from "next/font/google";
+import { cookies } from "next/headers";
 import { connection } from "next/server";
 import { WakingNotice } from "@/components/shell/WakingNotice";
+import {
+  THEME_COOKIE,
+  colorScheme,
+  parseThemeChoice,
+  themeAttribute,
+} from "@/lib/theme";
 import "./globals.css";
 
 /** Design.md §5 — Nunito for display, Nunito Sans for UI, JetBrains Mono for anything tabular. */
@@ -43,9 +50,19 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
    */
   await connection();
 
+  /**
+   * The theme is decided here, on the server, so the first paint is already the right
+   * colour. The alternative — reading a preference in the browser — is the white flash
+   * every dark mode is remembered for, and the usual cure for it is a blocking inline
+   * script, which this app's nonce CSP refuses on purpose (block 11).
+   */
+  const theme = parseThemeChoice((await cookies()).get(THEME_COOKIE)?.value);
+
   return (
     <html
       lang="en"
+      data-theme={themeAttribute(theme)}
+      style={{ colorScheme: colorScheme(theme) }}
       className={`${nunito.variable} ${nunitoSans.variable} ${jetbrainsMono.variable} h-full antialiased`}
     >
       <body className="min-h-full flex flex-col">

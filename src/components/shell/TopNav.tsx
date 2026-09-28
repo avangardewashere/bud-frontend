@@ -4,7 +4,9 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { BudIcon, Wordmark } from "@/components/bud";
 import type { PublicUser } from "@/lib/api";
+import type { ThemeChoice } from "@/lib/theme";
 import { SignOutButton } from "./SignOutButton";
+import { ThemeToggle } from "./ThemeToggle";
 
 /**
  * The shell's top bar — Design-Mockups.md, "Global shell".
@@ -28,7 +30,7 @@ export function navItems(user: PublicUser): NavItem[] {
   return items;
 }
 
-export function TopNav({ user }: { user: PublicUser }) {
+export function TopNav({ user, theme }: { user: PublicUser; theme: ThemeChoice }) {
   const pathname = usePathname();
   const items = navItems(user);
 
@@ -58,6 +60,7 @@ export function TopNav({ user }: { user: PublicUser }) {
         </ul>
 
         <div className="ml-auto flex items-center gap-3 md:ml-0">
+          <ThemeToggle known={theme} />
           <SignOutButton />
           <Avatar user={user} />
         </div>
