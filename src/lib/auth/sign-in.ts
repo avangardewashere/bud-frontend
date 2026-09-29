@@ -21,6 +21,9 @@ import type { AuthProviders } from "@/lib/api";
  */
 export const GITHUB_SIGN_IN_PATH = "/api/auth/github";
 
+/** What a deployment does about people who don't have an account yet. */
+export type SignupMode = "invite_only" | "open" | "closed" | "unknown";
+
 export type SignInOptions = {
   /** The password form. Off only if a deployment ever turns passwords off entirely. */
   password: boolean;
@@ -29,7 +32,7 @@ export type SignInOptions = {
   /** Claims the shared demo account. */
   demo: boolean;
   /** Whether to say anything about signing up, and what. */
-  signup: "invite_only" | "open" | "closed" | "unknown";
+  signup: SignupMode;
   /**
    * Whether the API actually answered. False means everything above is the shell's
    * fallback rather than this deployment's configuration.
@@ -76,8 +79,33 @@ const SIGN_IN_ERRORS: Record<string, string> = {
     "That sign-in link had gone stale. Start again from this page and it should work.",
   github_no_code: "GitHub sent us back without a code. Try once more.",
   github_failed: "GitHub sign-in didn't complete. Try once more, or use your password.",
-  signup_closed: "Signing up is invite-only for now, so that GitHub account can't be used yet.",
 };
+
+/**
+ * `signup_closed` is the one refusal whose *reason* is configuration, so it is the one
+ * message the shell must not hard-code.
+ *
+ * The API sends this code whenever a GitHub account has no Bud account and signing up
+ * is not open — which is true under `invite_only` and under `closed` alike. Saying
+ * "invite-only" in both cases states a rule this deployment may not have, and tells
+ * someone to go and find an invite that does not exist. The mode comes from
+ * `/auth/providers`, so the screen already knows; where it doesn't, it says less.
+ */
+function signupClosed(signup: SignupMode): string {
+  switch (signup) {
+    case "invite_only":
+      return "Signing up is invite-only for now, so that GitHub account can't be used yet.";
+    case "closed":
+      return "Signing up is closed for now, so that GitHub account can't be used yet.";
+    default:
+      /**
+       * "open" means the API contradicted itself between the two requests, and
+       * "unknown" means it could not be asked at all. Either way the refusal happened
+       * and the reason is not ours to state.
+       */
+      return "That GitHub account doesn't have a Bud account yet, and signing up isn't open just now.";
+  }
+}
 
 const UNRECOGNISED = "That sign-in didn't complete. Try once more.";
 
@@ -91,8 +119,9 @@ const UNRECOGNISED = "That sign-in didn't complete. Try once more.";
  * — a function or an object where a string was promised, which React then refuses to
  * render, taking the whole sign-in page down for anyone sent the link.
  */
-export function signInError(code: unknown): string | null {
+export function signInError(code: unknown, signup: SignupMode = "unknown"): string | null {
   if (typeof code !== "string" || code === "") return null;
+  if (code === "signup_closed") return signupClosed(signup);
   return Object.hasOwn(SIGN_IN_ERRORS, code) ? SIGN_IN_ERRORS[code] : UNRECOGNISED;
 }
 

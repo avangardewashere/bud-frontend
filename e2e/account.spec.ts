@@ -108,6 +108,36 @@ test("an error code from the API becomes a sentence, and anything else stays vag
   expect(signInError(42)).toBeNull();
 });
 
+test("the one refusal that depends on configuration says only what this deployment knows", () => {
+  /**
+   * The API sends `signup_closed` whenever a GitHub account has no Bud account and
+   * signing up isn't open — which is true under `invite_only` and under `closed`
+   * alike. Hard-coding "invite-only" would state a rule a deployment may not have, and
+   * send someone looking for an invite that doesn't exist. The mode comes from
+   * /auth/providers, so the screen already knows it.
+   */
+  expect(signInError("signup_closed", "invite_only")).toContain("invite-only");
+  expect(signInError("signup_closed", "closed")).toContain("closed");
+  expect(signInError("signup_closed", "closed")).not.toContain("invite-only");
+
+  /**
+   * "unknown" is the fallback's mode — the API could not be asked — and "open" means
+   * it contradicted itself between two requests. The refusal still happened, but its
+   * reason is not ours to state, so neither may claim a rule.
+   */
+  for (const mode of ["unknown", "open"] as const) {
+    const message = signInError("signup_closed", mode);
+    expect(message, mode).toBeTruthy();
+    expect(message, `${mode} must not claim a signup rule`).not.toContain("invite-only");
+    expect(message, `${mode} must not claim a signup rule`).not.toMatch(/is closed/);
+  }
+
+  // Unsaid is still a sentence, and still never the raw code.
+  const vague = signInError("signup_closed");
+  expect(vague).toMatch(/[.!?]$/);
+  expect(vague).not.toContain("signup_closed");
+});
+
 test("the door's failures are sentences too, including the demo's own two", () => {
   const api = (status: number, message: string) => new BudApiError(status, null, message);
 
@@ -249,6 +279,25 @@ test.describe("against the API", () => {
     await expect(unknown).toContainText("didn't complete");
     await expect(unknown).not.toContainText("onerror");
     await expect(password(page), "and the form still works").toBeVisible();
+  });
+
+  test("a signup refusal reads for this deployment's own rule, not a hard-coded one", async ({
+    page,
+  }) => {
+    /**
+     * The pure test above proves the sentence tracks the mode; this proves the page
+     * actually hands it the mode. Without this, `signInError(error)` on the page would
+     * quietly fall back to the "we can't say" wording on a deployment that knows
+     * perfectly well, and every pure assertion would still pass.
+     *
+     * Checked against what the API reports rather than what this machine happens to be
+     * set to, like the rest of the deployment-shaped tests here.
+     */
+    const providers = await budApi.providers();
+    await page.goto("/login?error=signup_closed");
+
+    const said = page.getByRole("alert").filter({ hasText: /./ });
+    await expect(said).toContainText(signInError("signup_closed", providers.signupMode)!);
   });
 
   test("a crafted ?error= cannot take the sign-in page away", async ({ page }) => {

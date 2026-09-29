@@ -57,7 +57,8 @@ export default async function LoginPage({ searchParams }: Params) {
           <p className="mt-1 text-[var(--muted-foreground)]">Glad you showed up.</p>
         </div>
 
-        <LoginForm options={options} error={signInError(error)} />
+        {/* The signup mode is passed in: one of these messages depends on it. */}
+        <LoginForm options={options} error={signInError(error, options.signup)} />
 
         {options.signup === "invite_only" && (
           <p className="mt-6 text-center text-sm text-[var(--muted-foreground)]">
