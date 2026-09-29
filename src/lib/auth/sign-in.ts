@@ -79,6 +79,14 @@ const SIGN_IN_ERRORS: Record<string, string> = {
     "That sign-in link had gone stale. Start again from this page and it should work.",
   github_no_code: "GitHub sent us back without a code. Try once more.",
   github_failed: "GitHub sign-in didn't complete. Try once more, or use your password.",
+  /**
+   * Mapped ahead of the API sending it: an unmapped code renders as the vague
+   * fallback, so the shell has to know a value before the API may use it. The Back
+   * End session adds it once this has shipped.
+   */
+  github_no_verified_email:
+    "That GitHub account has no verified email address, and Bud needs one to know who " +
+    "you are. Verify an address on GitHub and try again, or sign in with your password.",
 };
 
 /**

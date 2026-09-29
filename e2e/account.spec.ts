@@ -67,18 +67,34 @@ test("the sign-in rules, stated once", () => {
 });
 
 test("an error code from the API becomes a sentence, and anything else stays vague", () => {
-  // The codes the API really sends (backend github-oauth.controller.ts).
+  /**
+   * The codes the API really sends, spelled out as the cross-repo contract they are:
+   * they travel in a URL, not a JSON envelope, so no type on either side catches a
+   * rename. The backend pins the same list in `github-oauth.contract.spec.ts`, and the
+   * agreed order of changes is shell first, then API — an unmapped value renders as
+   * the vague fallback, which is a failure with no explanation.
+   */
   for (const code of [
     "github_declined",
     "github_state_mismatch",
     "github_no_code",
     "github_failed",
     "signup_closed",
+    // Mapped before the API sends it, so it can be added there without a round trip.
+    "github_no_verified_email",
   ]) {
     const message = signInError(code);
     expect(message, code).toBeTruthy();
     expect(message, `${code} should read as a sentence`).toMatch(/[.!?]$/);
     expect(message, "and never show the raw code").not.toContain(code);
+    /**
+     * The assertion that actually guards the contract. A renamed or dropped code does
+     * not throw here — it quietly falls through to the catch-all, which is the one
+     * outcome a recognised code must never produce.
+     */
+    expect(message, `${code} must be recognised, not swallowed by the fallback`).not.toBe(
+      "That sign-in didn't complete. Try once more.",
+    );
   }
 
   expect(signInError(null)).toBeNull();
