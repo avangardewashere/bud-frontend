@@ -1,6 +1,7 @@
 import { test, expect, type Page } from "@playwright/test";
 import { BudApiError, BudApiUnreachableError, BudApiWakingError, budApi } from "@/lib/api";
 import { PASSWORD_MIN_LENGTH, changeFailure, revokedMessage } from "@/lib/account/password";
+import { connectionWarning } from "@/lib/course/connection";
 import {
   GITHUB_SIGN_IN_PATH,
   PASSWORD_ONLY,
@@ -355,4 +356,27 @@ test.describe("against the API", () => {
       await expect(page.getByTestId("greeting")).toBeVisible();
     });
   });
+});
+
+test("a course that cannot reach the shell says what it costs, and names the addresses", () => {
+  // Same address: nothing to diagnose, so it stays a learner's sentence.
+  const plain = connectionWarning({
+    pageOrigin: "https://bud.example",
+    builtFor: "https://bud.example",
+  });
+  expect(plain).toContain("nothing you do in it will be saved");
+  expect(plain).not.toContain("built for");
+
+  /**
+   * Different address: this is the deploy mistake the audit found — the app opened on
+   * a hostname other than the one the course pages were published for. The shell knows
+   * both, so it says both rather than leaving it to the browser console.
+   */
+  const mismatched = connectionWarning({
+    pageOrigin: "https://bud-frontend-abc123-scope.vercel.app",
+    builtFor: "https://bud-frontend.vercel.app",
+  });
+  expect(mismatched).toContain("nothing you do in it will be saved");
+  expect(mismatched).toContain("https://bud-frontend.vercel.app");
+  expect(mismatched).toContain("https://bud-frontend-abc123-scope.vercel.app");
 });

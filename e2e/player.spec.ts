@@ -1,4 +1,5 @@
 import { test, expect, type Page } from "@playwright/test";
+import { HELLO_GRACE_MS } from "@/lib/course/connection";
 import { LEARNER, openSession, signIn, skipWithoutApi } from "./support/api";
 
 /**
@@ -235,4 +236,59 @@ test("a session that ended while the tab stayed open says so, and says the work 
    * The notes panel is a second hook with the same failure and the same promise; its
    * copy is asserted in notes.spec.ts, beside the rest of that panel's behaviour.
    */
+});
+
+test("a session that can't reach Bud says so, instead of looking fine and saving nothing", async ({
+  page,
+}) => {
+  /**
+   * The shell used to clear its overlay on the frame's `load` event — which the
+   * browser fires even for a frame it refused to embed — so every way this can fail
+   * ended in a blank rectangle with no message anywhere.
+   *
+   * All of those failures look the same from here: bridge.js never says hello. It is
+   * posted unconditionally while the course parses, addressed to the origin baked into
+   * the bridge tag, so it goes missing when the embed is refused (`frame-ancestors`),
+   * when the course was published for a different app address, or when bridge.js
+   * simply doesn't load. That last one is the honest way to produce it in a test — no
+   * mocking of the shell's own code, just a bridge that never runs.
+   */
+  await page.route("**/bridge.js", (route) =>
+    route.fulfill({ status: 200, contentType: "application/javascript", body: "" }),
+  );
+
+  await openSession(page, SLUG, SESSION_1);
+
+  const warning = page.getByTestId("course-disconnected");
+  await expect(warning).toBeVisible();
+  await expect(warning, "it has to say what it costs them").toContainText("nothing you do in it will be saved");
+
+  /**
+   * A banner, not an overlay. With bridge.js missing the worksheet still works in the
+   * tab — it just saves nothing — and covering a usable course would take away more
+   * than the message explains.
+   */
+  await expect(frame(page).locator("#t1")).toBeVisible();
+});
+
+test("a session that reaches Bud normally shows no such warning", async ({ page }) => {
+  /**
+   * The other half of the guarantee, and the one worth more: a false warning on a
+   * healthy course would be worse than the silence it replaced — it would tell someone
+   * their work isn't being saved while it is.
+   *
+   * The wait is the whole test. The banner cannot appear until HELLO_GRACE_MS after
+   * the frame loads, so asserting absence before then passes no matter what the shell
+   * does — which is exactly how an earlier version of this test let two mutations
+   * through. Imported rather than hardcoded so the two cannot drift apart.
+   */
+  await openSession(page, SLUG, SESSION_1);
+
+  const tick = frame(page).locator("#t1");
+  await tick.uncheck({ force: true });
+  await tick.check({ force: true });
+  await expect(page.getByRole("status").filter({ hasText: "Saved" })).toBeVisible();
+
+  await page.waitForTimeout(HELLO_GRACE_MS * 2);
+  await expect(page.getByTestId("course-disconnected")).toBeHidden();
 });

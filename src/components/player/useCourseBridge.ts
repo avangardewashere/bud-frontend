@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { BudApiError, BudApiUnreachableError, BudApiWakingError, budApi } from "@/lib/api";
+import { HELLO_GRACE_MS } from "@/lib/course/connection";
 import { courseWrites, stateKey } from "./stateWrites";
 
 const STATE_LOAD_DEADLINE_MS = 150_000;
@@ -45,6 +46,8 @@ const DID_NOT_LOAD =
 /** Long enough for a slow course, short enough that a hung load is not a mystery. */
 const LOAD_TIMEOUT_MS = 12_000;
 
+
+
 export type SaveState =
   | { status: "idle" }
   | { status: "saving" }
@@ -80,8 +83,19 @@ export function useCourseBridge({
    */
   const [loadedSrc, setLoadedSrc] = useState<string | null>(null);
   const [slowSrc, setSlowSrc] = useState<string | null>(null);
+  /** The src bridge.js last said hello for — i.e. the course is running and talking. */
+  const [spokeSrc, setSpokeSrc] = useState<string | null>(null);
+  /** The src we have finished waiting for a hello on. */
+  const [checkedSrc, setCheckedSrc] = useState<string | null>(null);
   const loaded = loadedSrc === src;
   const slow = slowSrc === src && !loaded;
+  const connected = spokeSrc === src;
+  /**
+   * The frame reported itself loaded, the grace period passed, and nothing ever said
+   * hello. The course is either not running at all (the browser refused the embed) or
+   * running but unable to reach us — and either way it will save nothing.
+   */
+  const silent = checkedSrc === src && !connected;
 
   // Kept in a ref so the listener is attached once and never re-attached mid-session.
   const ctx = useRef({ slug, sessionKey, onProgressChanged, src });
@@ -294,6 +308,7 @@ export function useCourseBridge({
 
       // A new document loads its state afresh.
       didNotLoad.clear();
+      setSpokeSrc(ctx.current.src);
 
       const channel = new MessageChannel();
       channel.port1.onmessage = (e) => {
@@ -348,7 +363,17 @@ export function useCourseBridge({
     return () => clearTimeout(timer);
   }, [src]);
 
+  /**
+   * Once the frame says it loaded, give the hello a moment and then stop expecting it.
+   * Keyed on src like everything else here, so moving to another session starts over.
+   */
+  useEffect(() => {
+    if (!loaded) return;
+    const timer = setTimeout(() => setCheckedSrc(src), HELLO_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [loaded, src]);
+
   const onFrameLoad = useCallback(() => setLoadedSrc(src), [src]);
 
-  return { frameRef, save, loaded, slow, onFrameLoad };
+  return { frameRef, save, loaded, slow, silent, onFrameLoad };
 }

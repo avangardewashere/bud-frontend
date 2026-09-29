@@ -16,6 +16,8 @@ import {
   type Deliverable,
 } from "@/lib/api";
 import { poseForCourse } from "@/lib/bud/mood";
+import { appOrigin } from "@/lib/config/origins";
+import { connectionWarning } from "@/lib/course/connection";
 import { DeliverablePanel } from "./DeliverablePanel";
 import { NotesPanel } from "./NotesPanel";
 import { SavedIndicator } from "./SavedIndicator";
@@ -82,7 +84,7 @@ export function CoursePlayer({
 
   const note = useSessionNote({ slug: course.slug, sessionKey: session.key, initial: initialNote });
 
-  const { frameRef, save, loaded, slow, onFrameLoad } = useCourseBridge({
+  const { frameRef, save, loaded, slow, silent, onFrameLoad } = useCourseBridge({
     slug: course.slug,
     sessionKey: session.key,
     src,
@@ -299,6 +301,29 @@ export function CoursePlayer({
         )}
 
         <main className="flex min-h-0 flex-1 flex-col gap-3 p-4">
+          {/*
+            The course loaded but never reached the shell, so nothing it does will be
+            saved. A banner rather than an overlay, on purpose: when bridge.js simply
+            failed to load the worksheet still works in-tab, and covering a usable
+            course would take away more than it explains. See lib/course/connection.ts.
+          */}
+          {silent && (
+            <p
+              role="alert"
+              data-testid="course-disconnected"
+              className="rounded-[var(--radius-card)] border border-[var(--danger)] bg-[var(--card)] px-3 py-2 text-sm text-[var(--danger)]"
+            >
+              {/*
+                `silent` is only ever true after an effect has run, so this never
+                evaluates on the server — but say so rather than rely on it, because a
+                bare `window` here would be a render crash if that ever changed.
+              */}
+              {connectionWarning({
+                pageOrigin: typeof window === "undefined" ? "" : window.location.origin,
+                builtFor: appOrigin(),
+              })}
+            </p>
+          )}
           <div className="relative min-h-0 flex-1">
             {!loaded && (
               <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 rounded-[var(--radius-card)] border border-[var(--border)] bg-[var(--card)]">
