@@ -53,6 +53,14 @@ The whole thing runs on free tiers, which means the API sleeps after 15 idle min
 - **There is no `loading.tsx` anywhere**, deliberately: a streamed loading screen commits the HTTP status before the layouts run, which turns real 404s and sign-in redirects into soft ones.
 - **`tools/sleepy-proxy.mjs`** is an API you can put to sleep, because server components call the API where Playwright cannot intercept.
 
+### The other half
+
+The API is a sibling NestJS project. Three things there are worth a look, and they are all consequences of the same $0 constraint rather than general good practice:
+
+- **`/health` returns a status string and an uptime counter, and nothing else** — no database, no object storage — pinned by a test that constructs the controller with `Proxy` stubs throwing on any property access. It has to stay that way because Render probes it continuously *and* this shell's login page calls it on mount to wake a sleeping instance; either caller touching Postgres would keep Neon from scaling to zero and spend the month's free compute. `/ready` does ping both, and is deliberately not the probe.
+- **The sign-in brake verifies the password before it honours a block**, and records a failure only for an attempt that also failed — so the brake never turns away someone who knows the password, and a correct one clears the counter. Inverted from the textbook order on purpose: the key is email + caller address, and behind this shell's `/api` rewrite the address half is constant, so blocking first would let anyone who knows an email lock its owner out from anywhere. (The blunt global per-IP limit in front of every route still applies — "always gets in" is a property of the brake, not of the request.)
+- **378 unit tests across 28 files run with nothing else up** — no database, no object store, no API process — with the suites that need a booted stack in a separate config. Which is the opposite trade from this repo, and worth comparing.
+
 ### What this deliberately is not
 
 - **Not deployed yet.** Everything above runs locally. No live URL to link.
