@@ -1,10 +1,81 @@
-# Bud — frontend (`bud-web`)
+# Bud
 
-The Bud shell: accounts, catalog, dashboard, player, notes, admin. Courses run inside it in a sandboxed iframe on a separate origin and report progress through a small `postMessage` bridge.
+A learning platform where **a course is somebody else's JavaScript**. You upload a zip of HTML worksheets; Bud serves them from a separate origin, runs them in a sandboxed iframe, and gives them a storage API so a learner's work survives a refresh. The interesting problem is not the app around that — it is that the course is untrusted code holding a learner's notes, and the shell has to hand it real data without ever letting it leave.
 
-Planning lives one folder up, in `../Planning/` — start with `Design-Mockups.md` for what the screens look like, and `Roadmap-Status.md` for where the whole project stands.
+<!-- Live demo: not yet deployed. Add the URL here once it is. -->
+
+![The player: Bud's shell in dark mode with a course worksheet running inside it](docs/screenshots/player-dark.png)
+
+That screenshot is the whole architecture in one frame. The chrome is dark because that is Bud's theme; the worksheet inside it is light because it is a **different document on a different origin**, with its own CSS, that Bud deliberately does not reach into — and could not, if it wanted to.
+
+---
+
+## The part worth reading
+
+### The sandbox is demonstrated, not asserted
+
+Most projects claim an iframe is safe. This one ships an attack that tries to break it, and fails on purpose:
+
+```console
+$ node tools/bridge-leak-probe.mjs
+
+════ result ════
+control                        data reached attacker: no
+navigate-away                  data reached attacker: no
+attacker-hello                 data reached attacker: no
+navigate-back                  data reached attacker: no
+popup-port                     data reached attacker: no
+popup-url                      data reached attacker: no
+
+OK: the bridge delivers only to the document that asked.
+
+with allow-popups added back — why the player does not set it:
+  popup-port                   data reached attacker: YES
+  popup-url                    data reached attacker: YES
+```
+
+The last two lines are the point. They are a *counter-demonstration*: the same probe, with one sandbox flag added back, showing the learner's data walking out — so the reason `allow-popups` is absent from the player is a result rather than an opinion.
+
+**What it found.** The shell used to answer a course's `storage.get` by posting the result to the frame's `window`. A `WindowProxy` tracks the browsing *context*, not the *document* — so a course could ask for its learner's saved work, navigate its own frame to another page it had uploaded, and receive the answer there. The obvious guard, re-comparing the window handle before replying, does not work: the probe leaks in runs that report the handles as different. Replies now travel over a transferred `MessagePort`, which belongs to the document that received it, so after a navigation there is nothing to deliver to and nothing to check. Structural rather than a timing check, and cheaper than the guard that doesn't work.
+
+**Scope it honestly**, because a portfolio claim that falls over under one question is worth less than no claim:
+
+- This is **reply integrity, not a completed theft**. A course is entitled to its own learner's state. Separate layers — `frame-src` in the shell's CSP, `connect-src 'none'` and a `sandbox` directive on every course response, no `allow-popups` — mean the leaked reply could not have left the browser anyway. The point is that the bridge no longer *depends* on those holding.
+- The probe runs the real `public/bridge.js`, read off disk, against a **stand-in shell** that does what the React hook does — not the hook itself. The player's real flags are pinned elsewhere: `e2e/security.spec.ts` reads the iframe's own `sandbox` attribute *and* the `sandbox` directive the courses origin sends, and fails unless they match flag for flag — two independently-maintained copies that have to agree, since looser on the server is a hole and tighter breaks courses in the player.
+- Course JavaScript is **not** locked down in general: the courses-origin CSP carries `unsafe-inline` for script and style, because the worksheets ship inline `<script>` and `<style>`. What is closed is the network — `connect-src 'none'`, `form-action 'none'`, no popups, no top-level navigation.
+
+### It is built for a server that falls asleep
+
+The whole thing runs on free tiers, which means the API sleeps after 15 idle minutes and takes about a minute to wake. That constraint shaped more of the code than any feature did — and the interesting half is not the spinner, it is refusing to lose work:
+
+- **Writes are queued per key**, so a retried save can never land on top of a newer one, even after moving between sessions.
+- **A course whose saved state failed to load cannot save over it.** The shell marks the key and refuses the next write until a fresh read proves what is there — because the shipped worksheets swallow a failed load and carry on with a blank sheet, whose next autosave would write that blank over everything.
+- **There is no `loading.tsx` anywhere**, deliberately: a streamed loading screen commits the HTTP status before the layouts run, which turns real 404s and sign-in redirects into soft ones.
+- **`tools/sleepy-proxy.mjs`** is an API you can put to sleep, because server components call the API where Playwright cannot intercept.
+
+### What this deliberately is not
+
+- **Not deployed yet.** Everything above runs locally. No live URL to link.
+- **Not "fully tested."** There is no unit-test runner at all: it is 140 Playwright tests across 16 files, end to end against the real API, of which 4 skip unless you stand up a sleepable proxy. The suite is deliberately kept *out* of CI, because it skips itself without the API and would be green while proving nothing. CI runs typecheck, lint, a production build, a build that must refuse blank origins, the leak probe, and a container build with a vulnerability scan.
+- **Not multi-user.** One learner and one admin, on purpose.
+- **One course.** The Docker package in `courses/` is third-party HTML that was never adapted to Bud — which is the point of the bridge, but it is one course, not a library.
+
+## Screenshots
+
+| | |
+|---|---|
+| ![Dashboard](docs/screenshots/dashboard.png) | ![The notes page](docs/screenshots/notes.png) |
+| The dashboard: what is owed, and what you wrote as you worked | Every note for a course, in session order, exportable as Markdown |
+
+<img src="docs/screenshots/player-phone.png" alt="The player at 390px" width="330">
+
+The player has a second layout on a phone: the session rail and notes become tabs in a bottom sheet.
+
+---
 
 ## Run it
+
+This is the shell (`bud-web`). The API is the sibling `Bud - backend` project, and the planning lives one folder up in `../Planning/` — `Design-Mockups.md` for what the screens are meant to look like, `Roadmap-Status.md` for where the whole project stands.
 
 ```bash
 npm install

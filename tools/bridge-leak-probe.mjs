@@ -275,9 +275,23 @@ for (const [name, r] of Object.entries(results)) {
   console.log(`${name.padEnd(30)} data reached attacker: ${r.leaked ? "YES" : "no"}`);
 }
 
-const bridgeFailures = ["navigate-away", "attacker-hello", "navigate-back", "popup-port"].filter(
-  (name) => results[name].leaked || results[name].portHandedOut,
-);
+/**
+ * Every scenario run under the player's real flags is gated — `popup-url` included.
+ *
+ * It was left out at first on the reasoning that `window.open` cannot open at all
+ * without `allow-popups`, so the case is informational under production flags. But
+ * that is precisely the assumption this probe exists to test rather than assume: if a
+ * browser ever let a sandboxed frame open one, or the flags regressed, the value would
+ * ride out in the URL, the table would print YES, and the probe would still exit 0.
+ * It does not leak today, so gating it costs nothing and catches the day it does.
+ */
+const bridgeFailures = [
+  "navigate-away",
+  "attacker-hello",
+  "navigate-back",
+  "popup-port",
+  "popup-url",
+].filter((name) => results[name].leaked || results[name].portHandedOut);
 
 if (!results.control.delivered) {
   console.error("\nFAIL: the control never delivered — this proves nothing.");
