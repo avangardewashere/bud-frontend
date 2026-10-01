@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BudApiError, BudApiUnreachableError, BudApiWakingError, budApi } from "@/lib/api";
+import { BudApiError, BudApiUnreachableError, BudApiWakingError } from "@/lib/api";
 import { HELLO_GRACE_MS } from "@/lib/course/connection";
+import { apiCourseStore, type CourseStore } from "./courseStore";
 import { courseWrites, stateKey } from "./stateWrites";
 
 const STATE_LOAD_DEADLINE_MS = 150_000;
@@ -62,6 +63,13 @@ type Request = { v: 1; id: number; method: string; params?: Record<string, unkno
 export type CourseBridgeOptions = {
   slug: string;
   sessionKey: string;
+  /**
+   * Where a learner's work goes. Defaults to the API, which is what the player uses.
+   * `npm run preview` passes an in-memory one so an author can drive their own
+   * worksheet with no account — see courseStore.ts for why this is an option rather
+   * than a branch inside the message loop.
+   */
+  store?: CourseStore;
   /** Absolute URL of the session's entry file on the courses origin. */
   src: string;
   /** Called when the course changes progress, so the shell can re-read it. */
@@ -71,6 +79,7 @@ export type CourseBridgeOptions = {
 export function useCourseBridge({
   slug,
   sessionKey,
+  store = apiCourseStore,
   src,
   onProgressChanged,
 }: CourseBridgeOptions) {
@@ -98,9 +107,9 @@ export function useCourseBridge({
   const silent = checkedSrc === src && !connected;
 
   // Kept in a ref so the listener is attached once and never re-attached mid-session.
-  const ctx = useRef({ slug, sessionKey, onProgressChanged, src });
+  const ctx = useRef({ slug, sessionKey, onProgressChanged, src, store });
   useEffect(() => {
-    ctx.current = { slug, sessionKey, onProgressChanged, src };
+    ctx.current = { slug, sessionKey, onProgressChanged, src, store };
   });
 
   /**
@@ -199,7 +208,13 @@ export function useCourseBridge({
         send({ v: 1, id: msg.id, error: { code, message } });
 
       const params = (msg.params ?? {}) as { key?: string; value?: string; fraction?: number };
-      const { slug: courseSlug, sessionKey: key, onProgressChanged: changed, src: current } = ctx.current;
+      const {
+        slug: courseSlug,
+        sessionKey: key,
+        onProgressChanged: changed,
+        src: current,
+        store: courseStore,
+      } = ctx.current;
 
       try {
         switch (msg.method) {
@@ -214,7 +229,7 @@ export function useCourseBridge({
               return;
             }
             try {
-              const loaded = await budApi.getState(courseSlug, storageKey, {
+              const loaded = await courseStore.getState(courseSlug, storageKey, {
                 signal: AbortSignal.timeout(STATE_LOAD_DEADLINE_MS),
               });
               didNotLoad.delete(laneKey);
@@ -234,7 +249,7 @@ export function useCourseBridge({
               // The course started blank. Only let it write if there was nothing to lose.
               let saved: string | null;
               try {
-                saved = (await budApi.getState(courseSlug, storageKey)).value;
+                saved = (await courseStore.getState(courseSlug, storageKey)).value;
               } catch {
                 saved = "unknown";
               }
@@ -250,11 +265,11 @@ export function useCourseBridge({
             if (msg.method === "storage.set") {
               const value = String(params.value);
               await courseWrites.write(laneKey, { kind: "set", value }, async (signal) => {
-                await budApi.putState(courseSlug, storageKey, value, { signal });
+                await courseStore.putState(courseSlug, storageKey, value, { signal });
               });
             } else {
               await courseWrites.write(laneKey, { kind: "delete" }, async (signal) => {
-                await budApi.deleteState(courseSlug, storageKey, { signal });
+                await courseStore.deleteState(courseSlug, storageKey, { signal });
               });
             }
             setSave({ status: "saved" });
@@ -263,12 +278,12 @@ export function useCourseBridge({
           }
           case "bud.complete":
             // The course suggests; the shell records. Its own state blob is untouched.
-            await budApi.completeSession(courseSlug, key);
+            await courseStore.completeSession(courseSlug, key);
             changed?.();
             reply({ ok: true });
             return;
           case "bud.progress":
-            await budApi.reportProgress(courseSlug, key, Number(params.fraction));
+            await courseStore.reportProgress(courseSlug, key, Number(params.fraction));
             changed?.();
             reply({ ok: true });
             return;

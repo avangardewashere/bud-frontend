@@ -10,17 +10,18 @@ import {
   BudApiError,
   BudApiUnreachableError,
   BudApiWakingError,
-  budApi,
   type CourseDetail,
   type CourseSession,
   type Deliverable,
 } from "@/lib/api";
 import { poseForCourse } from "@/lib/bud/mood";
+import { COURSE_SANDBOX_FLAGS } from "@/lib/course/sandbox.mjs";
 import { appOrigin } from "@/lib/config/origins";
 import { connectionWarning } from "@/lib/course/connection";
 import { DeliverablePanel } from "./DeliverablePanel";
 import { NotesPanel } from "./NotesPanel";
 import { SavedIndicator } from "./SavedIndicator";
+import { apiCourseStore, type CourseStore } from "./courseStore";
 import { useCourseBridge } from "./useCourseBridge";
 import { useSessionNote, type InitialNote } from "./useSessionNote";
 
@@ -47,6 +48,8 @@ export function CoursePlayer({
   note: initialNote,
   deliverable: initialDeliverable,
   deliverableUnknown = false,
+  learnerTools = true,
+  store,
 }: {
   course: CourseDetail;
   session: CourseSession;
@@ -57,6 +60,15 @@ export function CoursePlayer({
   deliverable: Deliverable | null;
   /** True when the page could not read them at all, so null means "unknown". */
   deliverableUnknown?: boolean;
+  /**
+   * Notes and Hand in are a learner's own, and both live in the API. `npm run preview`
+   * has no account and no API, so it turns them off rather than showing an author two
+   * controls that can only fail. Presentation only — nothing about the course frame or
+   * the bridge changes with it.
+   */
+  learnerTools?: boolean;
+  /** Where the course's own saved work goes. Defaults to the API; see courseStore.ts. */
+  store?: CourseStore;
 }) {
   const router = useRouter();
   const [focus, setFocus] = useState(false);
@@ -87,6 +99,7 @@ export function CoursePlayer({
   const { frameRef, save, loaded, slow, silent, onFrameLoad } = useCourseBridge({
     slug: course.slug,
     sessionKey: session.key,
+    store: store ?? apiCourseStore,
     src,
     onProgressChanged: () => router.refresh(),
   });
@@ -97,8 +110,10 @@ export function CoursePlayer({
    * someone working. Runs on the session, not on every refresh.
    */
   useEffect(() => {
-    budApi.openSession(course.slug, session.key).catch(() => {});
-  }, [course.slug, session.key]);
+    (store ?? apiCourseStore).openSession(course.slug, session.key).catch(() => {});
+    // `store` is stable by construction — a module constant for a learner, a useMemo
+    // in PreviewPlayer — so naming it here does not reopen the session on re-render.
+  }, [course.slug, session.key, store]);
 
   const ordered = [...course.sessions].sort((a, b) => a.order - b.order);
   const index = ordered.findIndex((s) => s.key === session.key);
@@ -134,9 +149,10 @@ export function CoursePlayer({
     // Whatever this press decides, the last press's ending is no longer what is wanted.
     if (finishTimer.current) clearTimeout(finishTimer.current);
     try {
-      if (complete) await budApi.uncompleteSession(course.slug, session.key);
+      const courseStore = store ?? apiCourseStore;
+      if (complete) await courseStore.uncompleteSession(course.slug, session.key);
       else {
-        await budApi.completeSession(course.slug, session.key);
+        await courseStore.completeSession(course.slug, session.key);
         bloom();
 
         /**
@@ -238,6 +254,7 @@ export function CoursePlayer({
 
         <span className="font-mono text-sm text-[var(--muted-foreground)]">{percent}%</span>
 
+        {learnerTools && (
         <Button
           ref={notesToggle}
           variant="secondary"
@@ -263,6 +280,7 @@ export function CoursePlayer({
             />
           )}
         </Button>
+        )}
 
         <Button
           variant="secondary"
@@ -364,7 +382,7 @@ export function CoursePlayer({
                * reached outside this frame. Change one, change all three;
                * e2e/security.spec.ts fails if they drift.
                */
-              sandbox="allow-scripts allow-forms allow-modals"
+              sandbox={COURSE_SANDBOX_FLAGS}
               allow="clipboard-write"
               className="size-full rounded-[var(--radius-card)] border border-[var(--border)] bg-white"
             />
@@ -375,7 +393,7 @@ export function CoursePlayer({
             do in a session, it belongs beside Mark complete, and the ask above the
             field is the manifest's own words (mockup 1g's caption row).
           */}
-          {session.deliverable && handIn && (
+          {learnerTools && session.deliverable && handIn && (
             <DeliverablePanel
               slug={course.slug}
               session={session}
@@ -410,7 +428,7 @@ export function CoursePlayer({
               <span className="md:hidden">
                 <SavedIndicator save={save} />
               </span>
-              {session.deliverable && (
+              {learnerTools && session.deliverable && (
                 <Button
                   ref={handInToggle}
                   variant="secondary"
@@ -444,7 +462,7 @@ export function CoursePlayer({
           Beside the course rather than over it: the ask is in the worksheet, and a
           note written from memory is a worse note. Phones get it as a sheet below.
         */}
-        {notesOpen && (
+        {learnerTools && notesOpen && (
           <aside
             id="notes-panel"
             aria-label="Your notes"
@@ -474,6 +492,7 @@ export function CoursePlayer({
             >
               Sessions · {done} / {ordered.length}
             </SheetTab>
+            {learnerTools && (
             <SheetTab
               open={sheet === "notes"}
               onClick={() => {
@@ -492,6 +511,7 @@ export function CoursePlayer({
                 />
               )}
             </SheetTab>
+            )}
           </div>
           <SavedIndicator save={save} />
         </div>
@@ -511,7 +531,7 @@ export function CoursePlayer({
           </>
         )}
 
-        {sheet === "notes" && (
+        {learnerTools && sheet === "notes" && (
           <section aria-label="Your notes" className="h-[60dvh] min-h-0 px-3 pb-3">
             <NotesPanel
               slug={course.slug}

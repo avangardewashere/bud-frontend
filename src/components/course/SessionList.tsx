@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { CourseSession, DeliverableList } from "@/lib/api";
 import { linkLabel, safeHref } from "@/lib/safe-href";
 import { STATUS_LABELS, StatusDot } from "./meta";
@@ -6,8 +7,11 @@ import { STATUS_LABELS, StatusDot } from "./meta";
  * The session list from mockups 1d and 1f: status dot, mono two-digit number, title,
  * and the status on the right. The active row is tinted.
  *
- * Sessions are not links yet — the player is block 7. Rendering them as inert rows
- * beats linking to a route that does not exist.
+ * Rows are inert by default. A caller that has somewhere to send them passes
+ * `hrefFor` — `npm run preview` does, so an author can open their own worksheet —
+ * and the row's title becomes a link. Inert stays the default because the course page
+ * uses this list beside its own Continue button, and two ways into the same session
+ * is one more than the mockup asks for.
  *
  * A session someone has handed something in for carries its link on a second line, so
  * the course page answers "where did I put that?" without opening the session again.
@@ -15,10 +19,13 @@ import { STATUS_LABELS, StatusDot } from "./meta";
 export function SessionList({
   sessions,
   deliverables = [],
+  hrefFor,
 }: {
   sessions: CourseSession[];
   /** What this learner has handed in for the course; empty when they are not enrolled. */
   deliverables?: DeliverableList;
+  /** Where a row leads, if anywhere. Omitted, the rows are not links. */
+  hrefFor?: (session: CourseSession) => string;
 }) {
   const bySession = new Map(deliverables.map((d) => [d.sessionKey, d]));
 
@@ -39,7 +46,18 @@ export function SessionList({
               <span className="font-mono text-xs text-[var(--muted-foreground)]">
                 {String(session.order).padStart(2, "0")}
               </span>
-              <span className="flex-1">{session.title}</span>
+              <span className="flex-1">
+                {hrefFor ? (
+                  <Link
+                    href={hrefFor(session)}
+                    className="rounded-sm hover:underline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--ring)]"
+                  >
+                    {session.title}
+                  </Link>
+                ) : (
+                  session.title
+                )}
+              </span>
               <span
                 className={
                   "text-xs " +

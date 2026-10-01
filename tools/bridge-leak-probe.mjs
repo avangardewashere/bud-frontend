@@ -36,6 +36,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import { chromium } from "@playwright/test";
+import { COURSE_SANDBOX_FLAGS } from "../src/lib/course/sandbox.mjs";
 
 const SHELL_PORT = 4911;
 const COURSE_PORT = 4912;
@@ -44,8 +45,12 @@ const SHELL_ORIGIN = `http://localhost:${SHELL_PORT}`;
 const COURSE_ORIGIN = `http://127.0.0.1:${COURSE_PORT}`;
 const SECRET = "LEARNER_PRIVATE_NOTES_abc123";
 
-/** Exactly the player's flags. Note the absence of allow-popups. */
-const SANDBOX = "allow-scripts allow-forms allow-modals";
+/**
+ * Exactly the player's flags — imported, not retyped. This copy used to be a literal
+ * checked by nothing, so a drift here would have quietly weakened the probe that
+ * exists to catch drift.
+ */
+const SANDBOX = COURSE_SANDBOX_FLAGS;
 /** The same, plus allow-popups — kept only to demonstrate why it is off. */
 const SANDBOX_WITH_POPUPS = `${SANDBOX} allow-popups`;
 

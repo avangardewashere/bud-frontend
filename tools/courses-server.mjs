@@ -16,10 +16,29 @@
 import { createServer } from "node:http";
 import { createReadStream } from "node:fs";
 import { stat, readFile, readdir } from "node:fs/promises";
-import { join, normalize, extname } from "node:path";
+import { join, normalize, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
+import { COURSE_SANDBOX_FLAGS } from "../src/lib/course/sandbox.mjs";
 
 const ROOT = fileURLToPath(new URL("../courses/", import.meta.url));
+
+/**
+ * Single-course mode, for `npm run preview`.
+ *
+ * Normally this serves a tree of fixtures laid out as {courseId}/{version}/…, standing
+ * in for object storage. An author previewing has one package in one folder, and that
+ * folder is not laid out that way and should not have to be. So preview passes the
+ * directory, the id and the version, and requests for exactly that /{id}/{version}/
+ * prefix resolve inside it. Everything else — the CSP, the bridge injection, the
+ * sandbox directive — is unchanged, which is the point: the author's worksheet is
+ * served under the same rules a learner's would be.
+ */
+const SINGLE = process.env.COURSES_SINGLE_DIR
+  ? {
+      dir: resolve(process.env.COURSES_SINGLE_DIR),
+      prefix: `/${process.env.COURSES_SINGLE_ID}/${process.env.COURSES_SINGLE_VERSION}/`,
+    }
+  : null;
 const PORT = Number(process.env.COURSES_PORT ?? 3101);
 const HOST = process.env.COURSES_HOST ?? "127.0.0.1";
 const APP_ORIGIN = process.env.APP_ORIGIN ?? "http://localhost:3100";
@@ -56,7 +75,7 @@ const TYPES = {
  * backend's COURSE_SANDBOX_FLAGS: tighter breaks courses in the player, looser is a
  * hole. Never allow-same-origin, allow-popups or allow-top-navigation.
  */
-export const COURSE_SANDBOX_FLAGS = "allow-scripts allow-forms allow-modals";
+export { COURSE_SANDBOX_FLAGS } from "../src/lib/course/sandbox.mjs";
 
 const CSP = [
   `sandbox ${COURSE_SANDBOX_FLAGS}`,
@@ -99,6 +118,9 @@ function inject(html) {
  * is a stand-in, and the warning is there so nobody mistakes it for the real thing.
  */
 async function fallbackVersion(urlPath) {
+  // Preview serves exactly the version in the manifest; substituting another would be
+  // showing the author a package they did not ask about.
+  if (SINGLE) return null;
   const [, course, version, ...rest] = urlPath.split("/");
   if (!course || !version || rest.length === 0) return null;
 
@@ -129,9 +151,16 @@ function resolveSafe(urlPath) {
   } catch {
     return null;
   }
-  const target = normalize(join(ROOT, decoded.replace(/^\/+/, "")));
-  // normalize() collapses "..", so anything still outside ROOT is an escape.
-  return target.startsWith(ROOT) ? target : null;
+
+  // Same containment rule either way: resolve, then refuse anything that escaped.
+  const [base, relative] =
+    SINGLE && decoded.startsWith(SINGLE.prefix)
+      ? [SINGLE.dir + sep, decoded.slice(SINGLE.prefix.length)]
+      : [ROOT, decoded.replace(/^\/+/, "")];
+
+  const target = normalize(join(base, relative.replace(/^\/+/, "")));
+  // normalize() collapses "..", so anything still outside the base is an escape.
+  return target.startsWith(base) ? target : null;
 }
 
 const server = createServer(async (req, res) => {
@@ -190,6 +219,6 @@ const server = createServer(async (req, res) => {
 
 server.listen(PORT, HOST, () => {
   console.log(`courses origin  ${COURSES_ORIGIN}`);
-  console.log(`serving         ${ROOT}`);
+  console.log(`serving         ${SINGLE ? `${SINGLE.dir} at ${SINGLE.prefix}` : ROOT}`);
   console.log(`framed by       ${APP_ORIGIN}`);
 });
