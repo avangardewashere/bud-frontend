@@ -72,8 +72,12 @@ The API is a sibling NestJS project. Three things there are worth a look, and th
 
 | | |
 |---|---|
-| ![Dashboard](docs/screenshots/dashboard.png) | ![The notes page](docs/screenshots/notes.png) |
-| The dashboard: what is owed, and what you wrote as you worked | Every note for a course, in session order, exportable as Markdown |
+| ![The dashboard in light mode](docs/screenshots/dashboard.png) | ![The same dashboard in dark mode](docs/screenshots/dashboard-dark.png) |
+| The dashboard: what is owed, and what you wrote as you worked | The same screen dark. The theme is a cookie the server reads, so the first byte of HTML already carries it — no inline script to fight the nonce CSP, and no flash |
+
+![The notes page](docs/screenshots/notes.png)
+
+Every note for a course, in session order, exportable as one Markdown file.
 
 <img src="docs/screenshots/player-phone.png" alt="The player at 390px" width="330">
 
